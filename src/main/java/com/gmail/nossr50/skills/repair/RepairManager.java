@@ -1,7 +1,5 @@
 package com.gmail.nossr50.skills.repair;
 
-import com.gmail.nossr50.config.AdvancedConfig;
-import com.gmail.nossr50.config.Config;
 import com.gmail.nossr50.config.experience.ExperienceConfig;
 import com.gmail.nossr50.datatypes.experience.XPGainReason;
 import com.gmail.nossr50.datatypes.interactions.NotificationType;
@@ -15,7 +13,6 @@ import com.gmail.nossr50.skills.repair.repairables.Repairable;
 import com.gmail.nossr50.util.EventUtils;
 import com.gmail.nossr50.util.Misc;
 import com.gmail.nossr50.util.Permissions;
-import com.gmail.nossr50.util.StringUtils;
 import com.gmail.nossr50.util.player.NotificationManager;
 import com.gmail.nossr50.util.random.RandomChanceSkillStatic;
 import com.gmail.nossr50.util.random.RandomChanceUtil;
@@ -24,6 +21,7 @@ import com.gmail.nossr50.util.skills.SkillActivationType;
 import com.gmail.nossr50.util.skills.SkillUtils;
 import com.gmail.nossr50.util.sounds.SoundManager;
 import com.gmail.nossr50.util.sounds.SoundType;
+import com.gmail.nossr50.util.text.StringUtils;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
@@ -51,11 +49,11 @@ public class RepairManager extends SkillManager {
             return;
         }
 
-        if (Config.getInstance().getRepairAnvilMessagesEnabled()) {
+        if (mcMMO.p.getGeneralConfig().getRepairAnvilMessagesEnabled()) {
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE, "Repair.Listener.Anvil");
         }
 
-        if (Config.getInstance().getRepairAnvilPlaceSoundsEnabled()) {
+        if (mcMMO.p.getGeneralConfig().getRepairAnvilPlaceSoundsEnabled()) {
             SoundManager.sendSound(player, player.getLocation(), SoundType.ANVIL);
         }
 
@@ -94,7 +92,6 @@ public class RepairManager extends SkillManager {
         PlayerInventory inventory = player.getInventory();
 
         Material repairMaterial = repairable.getRepairMaterial();
-        byte repairMaterialMetadata = repairable.getRepairMaterialMetadata();
         ItemStack toRemove = new ItemStack(repairMaterial);
 
         short startDurability = item.getDurability();
@@ -111,10 +108,6 @@ public class RepairManager extends SkillManager {
 
             String materialsNeeded = "";
 
-            if (repairMaterialMetadata != (byte) -1 && !inventory.containsAtLeast(toRemove, 1)) {
-                materialsNeeded += ":" + repairMaterialMetadata;
-            }
-
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Skills.NeedMore.Extra", prettyName, materialsNeeded);
             return;
         }
@@ -130,32 +123,35 @@ public class RepairManager extends SkillManager {
 
         // Lets get down to business,
         // To defeat, the huns.
-        int baseRepairAmount = repairable.getBaseRepairDurability(); // Did they send me daughters?
+        int baseRepairAmount = repairable.getBaseRepairDurability(item); // Did they send me daughters?
         short newDurability = repairCalculate(startDurability, baseRepairAmount); // When I asked for sons?
 
+        // toRemove should be refreshed before the event call.
+        toRemove = inventory.getItem(inventory.first(repairMaterial)).clone();
+        
         // Call event
         if (EventUtils.callRepairCheckEvent(player, (short) (startDurability - newDurability), toRemove, item).isCancelled()) {
             return;
         }
 
         // Handle the enchants
-        if (ArcaneForging.arcaneForgingEnchantLoss) {
+        if (ArcaneForging.arcaneForgingEnchantLoss && !Permissions.hasRepairEnchantBypassPerk(player)) {
             addEnchants(item);
         }
 
         // Remove the item
-        if (repairMaterialMetadata == -1) {
-            toRemove = inventory.getItem(inventory.first(repairMaterial)).clone();
-            toRemove.setAmount(1);
-        }
+        toRemove.setAmount(1);
 
         inventory.removeItem(toRemove);
 
         // Give out XP like candy
-        applyXpGain((float) ((getPercentageRepaired(startDurability, newDurability, repairable.getMaximumDurability()) * repairable.getXpMultiplier()) * ExperienceConfig.getInstance().getRepairXPBase() * ExperienceConfig.getInstance().getRepairXP(repairable.getRepairMaterialType())), XPGainReason.PVE);
+        applyXpGain((float) ((getPercentageRepaired(startDurability, newDurability, repairable.getMaximumDurability())
+                * repairable.getXpMultiplier())
+                * ExperienceConfig.getInstance().getRepairXPBase()
+                * ExperienceConfig.getInstance().getRepairXP(repairable.getRepairMaterialType())), XPGainReason.PVE);
 
         // BWONG BWONG BWONG
-        if (Config.getInstance().getRepairAnvilUseSoundsEnabled()) {
+        if (mcMMO.p.getGeneralConfig().getRepairAnvilUseSoundsEnabled()) {
             SoundManager.sendSound(player, player.getLocation(), SoundType.ANVIL);
             SoundManager.sendSound(player, player.getLocation(), SoundType.ITEM_BREAK);
         }
@@ -177,7 +173,7 @@ public class RepairManager extends SkillManager {
         Player player = getPlayer();
         long lastUse = getLastAnvilUse();
 
-        if (!SkillUtils.cooldownExpired(lastUse, 3) || !Config.getInstance().getRepairConfirmRequired()) {
+        if (!SkillUtils.cooldownExpired(lastUse, 3) || !mcMMO.p.getGeneralConfig().getRepairConfirmRequired()) {
             return true;
         }
 
@@ -206,7 +202,7 @@ public class RepairManager extends SkillManager {
      * @return The chance of keeping the enchantment
      */
     public double getKeepEnchantChance() {
-        return AdvancedConfig.getInstance().getArcaneForgingKeepEnchantsChance(getArcaneForgingRank());
+        return mcMMO.p.getAdvancedConfig().getArcaneForgingKeepEnchantsChance(getArcaneForgingRank());
     }
 
     /**
@@ -215,13 +211,13 @@ public class RepairManager extends SkillManager {
      * @return The chance of the enchantment being downgraded
      */
     public double getDowngradeEnchantChance() {
-        return AdvancedConfig.getInstance().getArcaneForgingDowngradeChance(getArcaneForgingRank());
+        return mcMMO.p.getAdvancedConfig().getArcaneForgingDowngradeChance(getArcaneForgingRank());
     }
 
-    /**
-     * Gets chance of keeping enchantment during repair.
-     *
-     * @return The chance of keeping the enchantment
+    /*
+      Gets chance of keeping enchantment during repair.
+
+      @return The chance of keeping the enchantment
      */
     /*public double getKeepEnchantChance() {
         int skillLevel = getSkillLevel();
@@ -235,10 +231,10 @@ public class RepairManager extends SkillManager {
         return 0;
     }*/
 
-    /**
-     * Gets chance of enchantment being downgraded during repair.
-     *
-     * @return The chance of the enchantment being downgraded
+    /*
+      Gets chance of enchantment being downgraded during repair.
+
+      @return The chance of the enchantment being downgraded
      */
     /*public double getDowngradeEnchantChance() {
         int skillLevel = getSkillLevel();
@@ -262,8 +258,14 @@ public class RepairManager extends SkillManager {
     private short repairCalculate(short durability, int repairAmount) {
         Player player = getPlayer();
 
-        if (Permissions.isSubSkillEnabled(player, SubSkillType.REPAIR_REPAIR_MASTERY) && RankUtils.hasUnlockedSubskill(getPlayer(), SubSkillType.REPAIR_REPAIR_MASTERY)) {
-            double bonus = repairAmount * Math.min((((Repair.repairMasteryMaxBonus / Repair.repairMasteryMaxBonusLevel) * getSkillLevel()) / 100.0D), Repair.repairMasteryMaxBonus / 100.0D);
+        if (Permissions.isSubSkillEnabled(player, SubSkillType.REPAIR_REPAIR_MASTERY)
+                && RankUtils.hasUnlockedSubskill(getPlayer(), SubSkillType.REPAIR_REPAIR_MASTERY)) {
+
+            double maxBonusCalc = Repair.repairMasteryMaxBonus / 100.0D;
+            double skillLevelBonusCalc = (Repair.repairMasteryMaxBonus / Repair.repairMasteryMaxBonusLevel) * (getSkillLevel() / 100.0D);
+            double bonus = repairAmount * Math.min(skillLevelBonusCalc, maxBonusCalc);
+
+
             repairAmount += bonus;
         }
 
@@ -326,10 +328,19 @@ public class RepairManager extends SkillManager {
         boolean downgraded = false;
 
         for (Entry<Enchantment, Integer> enchant : enchants.entrySet()) {
+            int enchantLevel = enchant.getValue();
+
+            if(!ExperienceConfig.getInstance().allowUnsafeEnchantments()) {
+                if(enchantLevel > enchant.getKey().getMaxLevel()) {
+                    enchantLevel = enchant.getKey().getMaxLevel();
+
+                    item.addEnchantment(enchant.getKey(), enchantLevel);
+                }
+            }
+
             Enchantment enchantment = enchant.getKey();
 
             if (RandomChanceUtil.checkRandomChanceExecutionSuccess(new RandomChanceSkillStatic(getKeepEnchantChance(), getPlayer(), SubSkillType.REPAIR_ARCANE_FORGING))) {
-                int enchantLevel = enchant.getValue();
 
                 if (ArcaneForging.arcaneForgingDowngrades && enchantLevel > 1
                         && (!RandomChanceUtil.checkRandomChanceExecutionSuccess(new RandomChanceSkillStatic(100 - getDowngradeEnchantChance(), getPlayer(), SubSkillType.REPAIR_ARCANE_FORGING)))) {
@@ -345,13 +356,13 @@ public class RepairManager extends SkillManager {
         Map<Enchantment, Integer> newEnchants = item.getEnchantments();
 
         if (newEnchants.isEmpty()) {
-            NotificationManager.sendPlayerInformation(getPlayer(), NotificationType.SUBSKILL_MESSAGE_FAILED, "Repair.Arcane.Fail");
+            NotificationManager.sendPlayerInformationChatOnly(getPlayer(),  "Repair.Arcane.Fail");
         }
         else if (downgraded || newEnchants.size() < enchants.size()) {
-            NotificationManager.sendPlayerInformation(getPlayer(), NotificationType.SUBSKILL_MESSAGE_FAILED, "Repair.Arcane.Downgrade");
+            NotificationManager.sendPlayerInformationChatOnly(getPlayer(),  "Repair.Arcane.Downgrade");
         }
         else {
-            NotificationManager.sendPlayerInformation(getPlayer(), NotificationType.SUBSKILL_MESSAGE, "Repair.Arcane.Perfect");
+            NotificationManager.sendPlayerInformationChatOnly(getPlayer(),  "Repair.Arcane.Perfect");
         }
     }
 

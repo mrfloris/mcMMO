@@ -12,7 +12,7 @@
 ## This defaults to OTHER.
 #
 # MaterialType: This is the type of the material of the item to be salvaged, this is only important for permissions.
-## Valid values are STRING, LEATHER, WOOD, STONE, IRON, GOLD, DIAMOND, and OTHER
+## Valid values are STRING, LEATHER, WOOD, STONE, IRON, GOLD, DIAMOND, NETHER, and OTHER
 ## This defaults to OTHER.
 #
 # SalvageMaterial: This is the material name of the item used to salvage this item.
@@ -61,7 +61,7 @@ Salvageables:
     WOODEN_AXE:
         MinimumLevel: 0
         XpMultiplier: .5
-        MaximumQuantity: 2
+        MaximumQuantity: 3
     WOODEN_HOE:
         MinimumLevel: 0
         XpMultiplier: .25
@@ -85,7 +85,7 @@ Salvageables:
     STONE_AXE:
         MinimumLevel: 0
         XpMultiplier: .5
-        MaximumQuantity: 2
+        MaximumQuantity: 3
     STONE_HOE:
         MinimumLevel: 0
         XpMultiplier: .25
@@ -109,7 +109,7 @@ Salvageables:
     IRON_AXE:
         MinimumLevel: 0
         XpMultiplier: 1
-        MaximumQuantity: 2
+        MaximumQuantity: 3
     IRON_HOE:
         MinimumLevel: 0
         XpMultiplier: .5
@@ -156,7 +156,7 @@ Salvageables:
     GOLDEN_AXE:
         MinimumLevel: 0
         XpMultiplier: 8
-        MaximumQuantity: 2
+        MaximumQuantity: 3
     GOLDEN_HOE:
         MinimumLevel: 0
         XpMultiplier: 4
@@ -197,7 +197,7 @@ Salvageables:
     DIAMOND_AXE:
         MinimumLevel: 50
         XpMultiplier: 1
-        MaximumQuantity: 2
+        MaximumQuantity: 3
     DIAMOND_HOE:
         MinimumLevel: 50
         XpMultiplier: .5
@@ -217,6 +217,44 @@ Salvageables:
         MaximumQuantity: 7
     DIAMOND_BOOTS:
         MinimumLevel: 50
+        XpMultiplier: 6
+        MaximumQuantity: 4
+
+    NETHERITE_SWORD:
+        MinimumLevel: 100
+        XpMultiplier: .5
+        MaximumQuantity: 4
+    NETHERITE_SHOVEL:
+        MinimumLevel: 100
+        XpMultiplier: .3
+        MaximumQuantity: 4
+    NETHERITE_PICKAXE:
+        MinimumLevel: 100
+        XpMultiplier: 1
+        MaximumQuantity: 4
+    NETHERITE_AXE:
+        MinimumLevel: 100
+        XpMultiplier: 1
+        MaximumQuantity: 4
+    NETHERITE_HOE:
+        MinimumLevel: 100
+        XpMultiplier: .5
+        MaximumQuantity: 4
+    # Armor
+    NETHERITE_HELMET:
+        MinimumLevel: 100
+        XpMultiplier: 6
+        MaximumQuantity: 4
+    NETHERITE_CHESTPLATE:
+        MinimumLevel: 100
+        XpMultiplier: 6
+        MaximumQuantity: 4
+    NETHERITE_LEGGINGS:
+        MinimumLevel: 100
+        XpMultiplier: 6
+        MaximumQuantity: 4
+    NETHERITE_BOOTS:
+        MinimumLevel: 100
         XpMultiplier: 6
         MaximumQuantity: 4
     #

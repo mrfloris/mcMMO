@@ -1,39 +1,41 @@
 package com.gmail.nossr50.config.treasure;
 
 import com.gmail.nossr50.config.ConfigLoader;
-import com.gmail.nossr50.datatypes.treasure.*;
-import com.gmail.nossr50.util.EnchantmentUtils;
-import com.gmail.nossr50.util.StringUtils;
+import com.gmail.nossr50.datatypes.treasure.ExcavationTreasure;
+import com.gmail.nossr50.datatypes.treasure.HylianTreasure;
+import com.gmail.nossr50.mcMMO;
+import com.gmail.nossr50.util.text.StringUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionData;
 import org.bukkit.potion.PotionType;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class TreasureConfig extends ConfigLoader {
 
+    public static final String FILENAME = "treasures.yml";
+    public static final String LEVEL_REQUIREMENT_RETRO_MODE = ".Level_Requirement.Retro_Mode";
+    public static final String LEVEL_REQUIREMENT_STANDARD_MODE = ".Level_Requirement.Standard_Mode";
+    public static final String WRONG_KEY_VALUE_STANDARD = ".Drop_Level.Standard_Mode";
+    public static final String WRONG_KEY_VALUE_RETRO = ".Drop_Level.Retro_Mode";
+    public static final String LEGACY_DROP_LEVEL = ".Drop_Level";
+    public static final String WRONG_KEY_ROOT = ".Drop_Level";
     private static TreasureConfig instance;
 
-    public HashMap<String, List<ExcavationTreasure>> excavationMap = new HashMap<String, List<ExcavationTreasure>>();
-
-    public HashMap<EntityType, List<ShakeTreasure>> shakeMap  = new HashMap<EntityType, List<ShakeTreasure>>();
-    public HashMap<String, List<HylianTreasure>>    hylianMap = new HashMap<String, List<HylianTreasure>>();
-
-    public HashMap<Rarity, List<FishingTreasure>>     fishingRewards      = new HashMap<Rarity, List<FishingTreasure>>();
-    public HashMap<Rarity, List<EnchantmentTreasure>> fishingEnchantments = new HashMap<Rarity, List<EnchantmentTreasure>>();
+    public HashMap<String, List<ExcavationTreasure>> excavationMap = new HashMap<>();
+    public HashMap<String, List<HylianTreasure>>    hylianMap = new HashMap<>();
 
     private TreasureConfig() {
-        super("treasures.yml");
+        super(FILENAME);
         loadKeys();
         validate();
     }
@@ -49,35 +51,7 @@ public class TreasureConfig extends ConfigLoader {
     @Override
     protected boolean validateKeys() {
         // Validate all the settings!
-        List<String> reason = new ArrayList<String>();
-        for (String tier : config.getConfigurationSection("Enchantment_Drop_Rates").getKeys(false)) {
-            double totalEnchantDropRate = 0;
-            double totalItemDropRate = 0;
-
-            for (Rarity rarity : Rarity.values()) {
-                double enchantDropRate = config.getDouble("Enchantment_Drop_Rates." + tier + "." + rarity.toString());
-                double itemDropRate = config.getDouble("Item_Drop_Rates." + tier + "." + rarity.toString());
-
-                if ((enchantDropRate < 0.0 || enchantDropRate > 100.0) && rarity != Rarity.RECORD) {
-                    reason.add("The enchant drop rate for " + tier + " items that are " + rarity.toString() + "should be between 0.0 and 100.0!");
-                }
-
-                if (itemDropRate < 0.0 || itemDropRate > 100.0) {
-                    reason.add("The item drop rate for " + tier + " items that are " + rarity.toString() + "should be between 0.0 and 100.0!");
-                }
-
-                totalEnchantDropRate += enchantDropRate;
-                totalItemDropRate += itemDropRate;
-            }
-
-            if (totalEnchantDropRate < 0 || totalEnchantDropRate > 100.0) {
-                reason.add("The total enchant drop rate for " + tier + " should be between 0.0 and 100.0!");
-            }
-
-            if (totalItemDropRate < 0 || totalItemDropRate > 100.0) {
-                reason.add("The total item drop rate for " + tier + " should be between 0.0 and 100.0!");
-            }
-        }
+        List<String> reason = new ArrayList<>();
 
         return noErrorsInConfig(reason);
     }
@@ -89,21 +63,12 @@ public class TreasureConfig extends ConfigLoader {
             return;
         }
 
-        loadTreasures("Fishing");
         loadTreasures("Excavation");
         loadTreasures("Hylian_Luck");
-        loadEnchantments();
-
-        for (EntityType entity : EntityType.values()) {
-            if (entity.isAlive()) {
-                loadTreasures("Shake." + entity.toString());
-            }
-        }
     }
 
     private void loadTreasures(String type) {
-        boolean isFishing = type.equals("Fishing");
-        boolean isShake = type.contains("Shake");
+        boolean shouldWeUpdateFile = false;
         boolean isExcavation = type.equals("Excavation");
         boolean isHylian = type.equals("Hylian_Luck");
 
@@ -113,16 +78,9 @@ public class TreasureConfig extends ConfigLoader {
             return;
         }
 
-        // Initialize fishing HashMap
-        for (Rarity rarity : Rarity.values()) {
-            if (!fishingRewards.containsKey(rarity)) {
-                fishingRewards.put(rarity, (new ArrayList<FishingTreasure>()));
-            }
-        }
-
         for (String treasureName : treasureSection.getKeys(false)) {
             // Validate all the things!
-            List<String> reason = new ArrayList<String>();
+            List<String> reason = new ArrayList<>();
 
             String[] treasureInfo = treasureName.split("[|]");
             String materialName = treasureInfo[0];
@@ -131,16 +89,7 @@ public class TreasureConfig extends ConfigLoader {
              * Material, Amount, and Data
              */
             Material material;
-
-            if (materialName.contains("INVENTORY")) {
-                // Use magic material BEDROCK to know that we're grabbing something from the inventory and not a normal treasure
-                if (!shakeMap.containsKey(EntityType.PLAYER))
-                    shakeMap.put(EntityType.PLAYER, new ArrayList<ShakeTreasure>());
-                shakeMap.get(EntityType.PLAYER).add(new ShakeTreasure(new ItemStack(Material.BEDROCK, 1, (byte) 0), 1, getInventoryStealDropChance(), getInventoryStealDropLevel()));
-                continue;
-            } else {
-                material = Material.matchMaterial(materialName);
-            }
+            material = Material.matchMaterial(materialName);
 
             int amount = config.getInt(type + "." + treasureName + ".Amount");
             short data = (treasureInfo.length == 2) ? Short.parseShort(treasureInfo[1]) : (short) config.getInt(type + "." + treasureName + ".Data");
@@ -150,7 +99,7 @@ public class TreasureConfig extends ConfigLoader {
             }
 
             if (amount <= 0) {
-                reason.add("Amount of " + treasureName + " must be greater than 0! " + amount);
+                amount = 1;
             }
 
             if (material != null && material.isBlock() && (data > 127 || data < -128)) {
@@ -163,7 +112,39 @@ public class TreasureConfig extends ConfigLoader {
 
             int xp = config.getInt(type + "." + treasureName + ".XP");
             double dropChance = config.getDouble(type + "." + treasureName + ".Drop_Chance");
-            int dropLevel = config.getInt(type + "." + treasureName + ".Drop_Level");
+            DropLevelKeyConversionType conversionType;
+
+            //Check for legacy drop level values and convert
+            if(getWrongKeyValue(type, treasureName, DropLevelKeyConversionType.LEGACY) != -1) {
+                //Legacy Drop level, needs to be converted
+                shouldWeUpdateFile = processAutomaticKeyConversion(type, shouldWeUpdateFile, treasureName, DropLevelKeyConversionType.LEGACY);
+            }
+
+            //Check for a bad key that was accidentally shipped out to some users
+            if(getWrongKeyValue(type, treasureName, DropLevelKeyConversionType.WRONG_KEY_STANDARD) != -1) {
+                //Partially converted to the new system, I had a dyslexic moment so some configs have this
+                shouldWeUpdateFile = processAutomaticKeyConversion(type, shouldWeUpdateFile, treasureName, DropLevelKeyConversionType.WRONG_KEY_STANDARD);
+            }
+
+            //Check for a bad key that was accidentally shipped out to some users
+            if(getWrongKeyValue(type, treasureName, DropLevelKeyConversionType.WRONG_KEY_RETRO) != -1) {
+                //Partially converted to the new system, I had a dyslexic moment so some configs have this
+                shouldWeUpdateFile = processAutomaticKeyConversion(type, shouldWeUpdateFile, treasureName, DropLevelKeyConversionType.WRONG_KEY_RETRO);
+            }
+
+            int dropLevel = -1;
+
+            if(mcMMO.isRetroModeEnabled()) {
+                dropLevel = config.getInt(type + "." + treasureName + LEVEL_REQUIREMENT_RETRO_MODE, -1);
+            } else {
+                dropLevel = config.getInt(type + "." + treasureName + LEVEL_REQUIREMENT_STANDARD_MODE, -1);
+            }
+
+            if(dropLevel == -1) {
+                mcMMO.p.getLogger().severe("Could not find a Level_Requirement entry for treasure " + treasureName);
+                mcMMO.p.getLogger().severe("Skipping treasure");
+                continue;
+            }
 
             if (xp < 0) {
                 reason.add(treasureName + " has an invalid XP value: " + xp);
@@ -171,23 +152,6 @@ public class TreasureConfig extends ConfigLoader {
 
             if (dropChance < 0.0D) {
                 reason.add(treasureName + " has an invalid Drop_Chance: " + dropChance);
-            }
-
-            if (dropLevel < 0) {
-                reason.add(treasureName + " has an invalid Drop_Level: " + dropLevel);
-            }
-
-            /*
-             * Specific Types
-             */
-            Rarity rarity = null;
-
-            if (isFishing) {
-                rarity = Rarity.getRarity(config.getString(type + "." + treasureName + ".Rarity"));
-
-                if (rarity == null) {
-                    reason.add("Invalid Rarity for item: " + treasureName);
-                }
             }
 
             /*
@@ -198,7 +162,7 @@ public class TreasureConfig extends ConfigLoader {
             if (materialName.contains("POTION")) {
                 Material mat = Material.matchMaterial(materialName);
                 if (mat == null) {
-                    reason.add("Potion format for Treasures.yml has changed");
+                    reason.add("Potion format for " + FILENAME + " has changed");
                 } else {
                     item = new ItemStack(mat, amount, data);
                     PotionMeta itemMeta = (PotionMeta) item.getItemMeta();
@@ -218,7 +182,7 @@ public class TreasureConfig extends ConfigLoader {
                     }
 
                     if (config.contains(type + "." + treasureName + ".Lore")) {
-                        List<String> lore = new ArrayList<String>();
+                        List<String> lore = new ArrayList<>();
                         for (String s : config.getStringList(type + "." + treasureName + ".Lore")) {
                             lore.add(ChatColor.translateAlternateColorCodes('&', s));
                         }
@@ -237,7 +201,7 @@ public class TreasureConfig extends ConfigLoader {
 
                 if (config.contains(type + "." + treasureName + ".Lore")) {
                     ItemMeta itemMeta = item.getItemMeta();
-                    List<String> lore = new ArrayList<String>();
+                    List<String> lore = new ArrayList<>();
                     for (String s : config.getStringList(type + "." + treasureName + ".Lore")) {
                         lore.add(ChatColor.translateAlternateColorCodes('&', s));
                     }
@@ -247,22 +211,13 @@ public class TreasureConfig extends ConfigLoader {
             }
 
             if (noErrorsInConfig(reason)) {
-                if (isFishing) {
-                    fishingRewards.get(rarity).add(new FishingTreasure(item, xp));
-                } else if (isShake) {
-                    ShakeTreasure shakeTreasure = new ShakeTreasure(item, xp, dropChance, dropLevel);
-
-                    EntityType entityType = EntityType.valueOf(type.substring(6));
-                    if (!shakeMap.containsKey(entityType))
-                        shakeMap.put(entityType, new ArrayList<ShakeTreasure>());
-                    shakeMap.get(entityType).add(shakeTreasure);
-                } else if (isExcavation) {
+                if (isExcavation) {
                     ExcavationTreasure excavationTreasure = new ExcavationTreasure(item, xp, dropChance, dropLevel);
                     List<String> dropList = config.getStringList(type + "." + treasureName + ".Drops_From");
 
                     for (String blockType : dropList) {
                         if (!excavationMap.containsKey(blockType))
-                            excavationMap.put(blockType, new ArrayList<ExcavationTreasure>());
+                            excavationMap.put(blockType, new ArrayList<>());
                         excavationMap.get(blockType).add(excavationTreasure);
                     }
                 } else if (isHylian) {
@@ -301,65 +256,77 @@ public class TreasureConfig extends ConfigLoader {
                 }
             }
         }
-    }
 
-    private void AddHylianTreasure(String dropper, HylianTreasure treasure) {
-        if (!hylianMap.containsKey(dropper))
-            hylianMap.put(dropper, new ArrayList<HylianTreasure>());
-        hylianMap.get(dropper).add(treasure);
-    }
-
-    private void loadEnchantments() {
-        for (Rarity rarity : Rarity.values()) {
-            if (rarity == Rarity.RECORD) {
-                continue;
-            }
-
-            if (!fishingEnchantments.containsKey(rarity)) {
-                fishingEnchantments.put(rarity, (new ArrayList<EnchantmentTreasure>()));
-            }
-
-            ConfigurationSection enchantmentSection = config.getConfigurationSection("Enchantments_Rarity." + rarity.toString());
-
-            if (enchantmentSection == null) {
-                return;
-            }
-
-            for (String enchantmentName : enchantmentSection.getKeys(false)) {
-                int level = config.getInt("Enchantments_Rarity." + rarity.toString() + "." + enchantmentName);
-                Enchantment enchantment = EnchantmentUtils.getByName(enchantmentName);
-
-                if (enchantment == null) {
-                    plugin.getLogger().warning("Skipping invalid enchantment in treasures.yml: " + enchantmentName);
-                    continue;
-                }
-
-                fishingEnchantments.get(rarity).add(new EnchantmentTreasure(enchantment, level));
+        //Apply our fix
+        if(shouldWeUpdateFile) {
+            try {
+                config.save(getFile());
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
 
-    public boolean getInventoryStealEnabled() {
-        return config.contains("Shake.PLAYER.INVENTORY");
+    private boolean processAutomaticKeyConversion(String type, boolean shouldWeUpdateTheFile, String treasureName, DropLevelKeyConversionType conversionType) {
+        switch (conversionType) {
+            case LEGACY:
+                int legacyDropLevel = getWrongKeyValue(type, treasureName, conversionType); //Legacy only had one value, Retro Mode didn't have a setting
+                //Config needs to be updated to be more specific
+                mcMMO.p.getLogger().info("(" + treasureName + ") [Fixing bad address: Legacy] Converting Drop_Level to Level_Requirement in treasures.yml for treasure to match new expected format");
+                config.set(type + "." + treasureName + LEGACY_DROP_LEVEL, null); //Remove legacy entry
+                config.set(type + "." + treasureName + LEVEL_REQUIREMENT_RETRO_MODE, legacyDropLevel * 10); //Multiply by 10 for Retro
+                config.set(type + "." + treasureName + LEVEL_REQUIREMENT_STANDARD_MODE, legacyDropLevel);
+                shouldWeUpdateTheFile = true;
+                break;
+            case WRONG_KEY_STANDARD:
+                mcMMO.p.getLogger().info("(" + treasureName + ") [Fixing bad address: STANDARD] Converting Drop_Level to Level_Requirement in treasures.yml for treasure to match new expected format");
+                int wrongKeyValueStandard = getWrongKeyValue(type, treasureName, conversionType);
+                config.set(type + "." + treasureName + WRONG_KEY_ROOT, null); //We also kill the Retro key here as we have enough information for setting in values if needed
+
+                if(wrongKeyValueStandard != -1) {
+                    config.set(type + "." + treasureName + LEVEL_REQUIREMENT_STANDARD_MODE, wrongKeyValueStandard);
+                    config.set(type + "." + treasureName + LEVEL_REQUIREMENT_RETRO_MODE, wrongKeyValueStandard * 10); //Multiply by 10 for Retro
+                }
+
+                shouldWeUpdateTheFile = true;
+                break;
+            case WRONG_KEY_RETRO:
+                mcMMO.p.getLogger().info("(" + treasureName + ") [Fixing bad address: RETRO] Converting Drop_Level to Level_Requirement in treasures.yml for treasure to match new expected format");
+                int wrongKeyValueRetro = getWrongKeyValue(type, treasureName, conversionType);
+                config.set(type + "." + treasureName + WRONG_KEY_ROOT, null); //We also kill the Retro key here as we have enough information for setting in values if needed
+
+                if(wrongKeyValueRetro != -1) {
+                    config.set(type + "." + treasureName + LEVEL_REQUIREMENT_RETRO_MODE, wrongKeyValueRetro);
+                }
+
+                shouldWeUpdateTheFile = true;
+                break;
+        }
+        return shouldWeUpdateTheFile;
     }
 
-    public boolean getInventoryStealStacks() {
-        return config.getBoolean("Shake.PLAYER.INVENTORY.Whole_Stacks");
+    private int getWrongKeyValue(String type, String treasureName, DropLevelKeyConversionType dropLevelKeyConversionType) {
+        switch (dropLevelKeyConversionType) {
+            case LEGACY:
+                return config.getInt(type + "." + treasureName + LEGACY_DROP_LEVEL, -1);
+            case WRONG_KEY_STANDARD:
+                return config.getInt(type + "." + treasureName + WRONG_KEY_VALUE_STANDARD, -1);
+            case WRONG_KEY_RETRO:
+                return config.getInt(type + "." + treasureName + WRONG_KEY_VALUE_RETRO, -1);
+        }
+
+        return -1;
     }
 
-    public double getInventoryStealDropChance() {
-        return config.getDouble("Shake.PLAYER.INVENTORY.Drop_Chance");
+    private enum DropLevelKeyConversionType {
+        LEGACY,
+        WRONG_KEY_STANDARD,
+        WRONG_KEY_RETRO
     }
 
-    public int getInventoryStealDropLevel() {
-        return config.getInt("Shake.PLAYER.INVENTORY.Drop_Level");
-    }
-
-    public double getItemDropRate(int tier, Rarity rarity) {
-        return config.getDouble("Item_Drop_Rates.Tier_" + tier + "." + rarity.toString());
-    }
-
-    public double getEnchantmentDropRate(int tier, Rarity rarity) {
-        return config.getDouble("Enchantment_Drop_Rates.Tier_" + tier + "." + rarity.toString());
+    private void AddHylianTreasure(String dropper, HylianTreasure treasure) {
+        if (!hylianMap.containsKey(dropper))
+            hylianMap.put(dropper, new ArrayList<>());
+        hylianMap.get(dropper).add(treasure);
     }
 }

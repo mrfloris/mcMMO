@@ -7,7 +7,9 @@ import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.datatypes.skills.SuperAbilityType;
 import com.gmail.nossr50.datatypes.skills.subskills.AbstractSubSkill;
 import com.gmail.nossr50.listeners.InteractionManager;
+import com.gmail.nossr50.mcMMO;
 import com.gmail.nossr50.runnables.skills.SkillUnlockNotificationTask;
+import com.gmail.nossr50.util.Permissions;
 import com.gmail.nossr50.util.player.UserManager;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -16,6 +18,7 @@ import java.util.HashMap;
 
 public class RankUtils {
     private static HashMap<String, HashMap<Integer, Integer>> subSkillRanks;
+    private static int count = 0;
 
     /**
      *
@@ -26,9 +29,7 @@ public class RankUtils {
      */
     public static void executeSkillUnlockNotifications(Plugin plugin, McMMOPlayer mcMMOPlayer, PrimarySkillType primarySkillType, int newLevel)
     {
-        int count = 0;
-
-        for(SubSkillType subSkillType : primarySkillType.getSkillAbilities())
+        for(SubSkillType subSkillType : mcMMO.p.getSkillTools().getSubSkills(primarySkillType))
         {
             int playerRankInSkill = getRank(mcMMOPlayer.getPlayer(), subSkillType);
 
@@ -36,18 +37,27 @@ public class RankUtils {
 
             //If the skill doesn't have registered ranks gtfo
             if(innerMap == null || innerMap.get(playerRankInSkill) == null)
-                return;
+                continue;
+
+            //Don't send notifications if the player lacks the permission node
+            if(!Permissions.isSubSkillEnabled(mcMMOPlayer.getPlayer(), subSkillType))
+                continue;
 
             //The players level is the exact level requirement for this skill
             if(newLevel == innerMap.get(playerRankInSkill))
             {
                 SkillUnlockNotificationTask skillUnlockNotificationTask = new SkillUnlockNotificationTask(mcMMOPlayer, subSkillType, newLevel);
 
-                skillUnlockNotificationTask.runTaskLater(plugin, ((count * 4) + 1) * 20);
+                skillUnlockNotificationTask.runTaskLater(plugin, (count * 100));
 
                 count++;
             }
         }
+    }
+
+    public static void resetUnlockDelayTimer()
+    {
+        count = 0;
     }
 
     /* NEW SYSTEM */
@@ -147,6 +157,17 @@ public class RankUtils {
 
     /**
      * Gets the current rank of the subskill for the player
+     * @param mmoPlayer The player in question
+     * @param subSkillType Target subskill
+     * @return The rank the player currently has achieved in this skill. -1 for skills without ranks.
+     */
+    public static int getRank(McMMOPlayer mmoPlayer, SubSkillType subSkillType)
+    {
+        return getRank(mmoPlayer.getPlayer(), subSkillType);
+    }
+
+    /**
+     * Gets the current rank of the subskill for the player
      * @param player The player in question
      * @param subSkillType Target subskill
      * @return The rank the player currently has achieved in this skill. -1 for skills without ranks.
@@ -167,6 +188,9 @@ public class RankUtils {
 
         //Get our rank map
         HashMap<Integer, Integer> rankMap = subSkillRanks.get(skillName);
+
+        if(UserManager.getPlayer(player) == null)
+            return 0;
 
         //Skill level of parent skill
         int currentSkillLevel = UserManager.getPlayer(player).getSkillLevel(subSkillType.getParentSkill());
@@ -211,6 +235,9 @@ public class RankUtils {
 
         //Get our rank map
         HashMap<Integer, Integer> rankMap = subSkillRanks.get(skillName);
+
+        if(UserManager.getPlayer(player) == null)
+            return 0;
 
         //Skill level of parent skill
         int currentSkillLevel = UserManager.getPlayer(player).getSkillLevel(abstractSubSkill.getPrimarySkill());
@@ -261,8 +288,7 @@ public class RankUtils {
         if (subSkillRanks == null)
             subSkillRanks = new HashMap<>();
 
-        if (subSkillRanks.get(s) == null)
-            subSkillRanks.put(s, new HashMap<>());
+        subSkillRanks.computeIfAbsent(s, k -> new HashMap<>());
     }
 
 /*    public static int getSubSkillUnlockRequirement(SubSkillType subSkillType)
@@ -347,5 +373,12 @@ public class RankUtils {
     public static int getSuperAbilityUnlockRequirement(SuperAbilityType superAbilityType)
     {
         return getRankUnlockLevel(superAbilityType.getSubSkillTypeDefinition(), 1);
+    }
+
+    public static boolean isPlayerMaxRankInSubSkill(Player player, SubSkillType subSkillType) {
+        int playerRank = getRank(player, subSkillType);
+        int highestRank = getHighestRank(subSkillType);
+
+        return playerRank == highestRank;
     }
 }

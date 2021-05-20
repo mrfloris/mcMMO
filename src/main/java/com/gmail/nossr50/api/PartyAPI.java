@@ -1,6 +1,5 @@
 package com.gmail.nossr50.api;
 
-import com.gmail.nossr50.config.Config;
 import com.gmail.nossr50.datatypes.interactions.NotificationType;
 import com.gmail.nossr50.datatypes.party.Party;
 import com.gmail.nossr50.datatypes.party.PartyLeader;
@@ -41,6 +40,9 @@ public final class PartyAPI {
      * @return true if the player is in a party, false otherwise
      */
     public static boolean inParty(Player player) {
+        if(UserManager.getPlayer(player) == null)
+            return false;
+
         return UserManager.getPlayer(player).inParty();
     }
 
@@ -79,6 +81,10 @@ public final class PartyAPI {
      */
     @Deprecated
     public static void addToParty(Player player, String partyName) {
+        //Check if player profile is loaded
+        if(UserManager.getPlayer(player) == null)
+            return;
+
         Party party = PartyManager.getParty(partyName);
 
         if (party == null) {
@@ -101,7 +107,7 @@ public final class PartyAPI {
      */
     public static int getMaxPartySize()
     {
-        return Config.getInstance().getPartyMaxSize();
+        return mcMMO.p.getGeneralConfig().getPartyMaxSize();
     }
 
     /**
@@ -113,7 +119,12 @@ public final class PartyAPI {
      * @param partyName The party to add the player to
      * @param bypassLimit if true bypasses party size limits
      */
+    //TODO: bypasslimit not used?
     public static void addToParty(Player player, String partyName, boolean bypassLimit) {
+        //Check if player profile is loaded
+        if(UserManager.getPlayer(player) == null)
+            return;
+
         Party party = PartyManager.getParty(partyName);
 
         if (party == null) {
@@ -131,6 +142,10 @@ public final class PartyAPI {
      * @param player The player to remove
      */
     public static void removeFromParty(Player player) {
+        //Check if player profile is loaded
+        if(UserManager.getPlayer(player) == null)
+            return;
+
         PartyManager.removeFromParty(UserManager.getPlayer(player));
     }
 
@@ -169,7 +184,7 @@ public final class PartyAPI {
      */
     @Deprecated
     public static List<OfflinePlayer> getOnlineAndOfflineMembers(Player player) {
-        List<OfflinePlayer> members = new ArrayList<OfflinePlayer>();
+        List<OfflinePlayer> members = new ArrayList<>();
 
         for (UUID memberUniqueId : PartyManager.getAllMembers(player).keySet()) {
             OfflinePlayer member = mcMMO.p.getServer().getOfflinePlayer(memberUniqueId);

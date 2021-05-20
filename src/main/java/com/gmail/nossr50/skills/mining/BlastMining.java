@@ -1,12 +1,9 @@
 package com.gmail.nossr50.skills.mining;
 
-import com.gmail.nossr50.config.AdvancedConfig;
-import com.gmail.nossr50.config.Config;
 import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.mcMMO;
 import com.gmail.nossr50.util.player.UserManager;
 import com.gmail.nossr50.util.skills.RankUtils;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -35,24 +32,22 @@ public class BlastMining {
         }
 
         protected int getLevel() {
-            return AdvancedConfig.getInstance().getBlastMiningRankLevel(this);
+            return mcMMO.p.getAdvancedConfig().getBlastMiningRankLevel(this);
         }
 
 
     }*/
 
-    public static Material detonator = Config.getInstance().getDetonatorItem();
-
     public final static int MAXIMUM_REMOTE_DETONATION_DISTANCE = 100;
 
     public static double getBlastRadiusModifier(int rank) {
-        return AdvancedConfig.getInstance().getBlastRadiusModifier(rank);
+        return mcMMO.p.getAdvancedConfig().getBlastRadiusModifier(rank);
     }
 
 
 
     public static double getBlastDamageDecrease(int rank) {
-        return AdvancedConfig.getInstance().getBlastDamageDecrease(rank);
+        return mcMMO.p.getAdvancedConfig().getBlastDamageDecrease(rank);
     }
 
 
@@ -103,7 +98,12 @@ public class BlastMining {
         // We can make this assumption because we (should) be the only ones using this exact metadata
         Player player = mcMMO.p.getServer().getPlayerExact(tnt.getMetadata(mcMMO.tntMetadataKey).get(0).asString());
 
-        if (!player.equals(defender)) {
+        if (!(player != null && player.equals(defender))) {
+            return false;
+        }
+
+        if(UserManager.getPlayer(defender) == null)
+        {
             return false;
         }
 

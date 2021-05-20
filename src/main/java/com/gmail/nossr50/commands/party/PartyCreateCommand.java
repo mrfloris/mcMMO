@@ -8,15 +8,22 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
 public class PartyCreateCommand implements CommandExecutor {
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         switch (args.length) {
             case 2:
             case 3:
                 Player player = (Player) sender;
                 McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+
+                if(UserManager.getPlayer(player) == null)
+                {
+                    player.sendMessage(LocaleLoader.getString("Profile.PendingLoad"));
+                    return true;
+                }
 
                 // Check to see if the party exists, and if it does cancel creating a new party
                 if (PartyManager.checkPartyExistence(player, args[1])) {

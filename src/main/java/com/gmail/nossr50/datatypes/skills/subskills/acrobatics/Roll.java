@@ -1,17 +1,16 @@
 package com.gmail.nossr50.datatypes.skills.subskills.acrobatics;
 
-import com.gmail.nossr50.config.AdvancedConfig;
-import com.gmail.nossr50.config.Config;
 import com.gmail.nossr50.config.experience.ExperienceConfig;
-import com.gmail.nossr50.datatypes.LimitedSizeList;
 import com.gmail.nossr50.datatypes.experience.XPGainReason;
 import com.gmail.nossr50.datatypes.interactions.NotificationType;
 import com.gmail.nossr50.datatypes.player.McMMOPlayer;
 import com.gmail.nossr50.datatypes.player.PlayerProfile;
+import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
 import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.locale.LocaleLoader;
 import com.gmail.nossr50.mcMMO;
 import com.gmail.nossr50.util.EventUtils;
+import com.gmail.nossr50.util.ItemUtils;
 import com.gmail.nossr50.util.Permissions;
 import com.gmail.nossr50.util.player.NotificationManager;
 import com.gmail.nossr50.util.player.UserManager;
@@ -23,7 +22,8 @@ import com.gmail.nossr50.util.skills.SkillActivationType;
 import com.gmail.nossr50.util.skills.SkillUtils;
 import com.gmail.nossr50.util.sounds.SoundManager;
 import com.gmail.nossr50.util.sounds.SoundType;
-import net.md_5.bungee.api.chat.ComponentBuilder;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.SoundCategory;
@@ -34,14 +34,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.HashMap;
+import java.util.Locale;
 
 public class Roll extends AcrobaticsSubSkill {
-    protected HashMap<Player, LimitedSizeList> fallLocationMap;
+
 
     public Roll() {
         super("Roll", EventPriority.HIGHEST, SubSkillType.ACROBATICS_ROLL);
-        fallLocationMap = new HashMap<>();
     }
 
     /**
@@ -67,28 +66,27 @@ public class Roll extends AcrobaticsSubSkill {
         if(!EventUtils.isRealPlayerDamaged(entityDamageEvent))
             return false;
 
-        switch (entityDamageEvent.getCause()) {
-            case FALL:
+        if (entityDamageEvent.getCause() == EntityDamageEvent.DamageCause.FALL) {//Grab the player
+            McMMOPlayer mcMMOPlayer = EventUtils.getMcMMOPlayer(entityDamageEvent.getEntity());
 
-                //Grab the player
-                McMMOPlayer mcMMOPlayer = EventUtils.getMcMMOPlayer(entityDamageEvent.getEntity());
+            if (mcMMOPlayer == null)
+                return false;
 
-                /*
-                 * Check for success
-                 */
-                Player player = (Player) ((EntityDamageEvent) event).getEntity();
-                if (canRoll(player)) {
-                    entityDamageEvent.setDamage(rollCheck(player, mcMMOPlayer, entityDamageEvent.getDamage()));
+            /*
+             * Check for success
+             */
+            Player player = (Player) ((EntityDamageEvent) event).getEntity();
+            if (canRoll(player)) {
+                entityDamageEvent.setDamage(rollCheck(player, mcMMOPlayer, entityDamageEvent.getFinalDamage()));
 
-                    if (entityDamageEvent.getFinalDamage() == 0) {
-                        entityDamageEvent.setCancelled(true);
-                        return true;
-                    }
+                if (entityDamageEvent.getFinalDamage() == 0) {
+                    entityDamageEvent.setCancelled(true);
+                    return true;
                 }
-                break;
-
-            default:
-                break;
+            } else if(mcMMO.p.getSkillTools().doesPlayerHaveSkillPermission(player, PrimarySkillType.ACROBATICS)) {
+                //Give XP Anyways
+                SkillUtils.applyXpGain(mcMMOPlayer, getPrimarySkill(), calculateRollXP(player, ((EntityDamageEvent) event).getFinalDamage(), false), XPGainReason.PVE);
+            }
         }
 
         return false;
@@ -101,7 +99,7 @@ public class Roll extends AcrobaticsSubSkill {
      */
     @Override
     public String getPermissionNode() {
-        return ("mcmmo.ability."+getPrimaryKeyName()+"."+getConfigKeyName()).toLowerCase();
+        return ("mcmmo.ability."+getPrimaryKeyName()+"."+getConfigKeyName()).toLowerCase(Locale.ENGLISH);
     }
 
     /**
@@ -122,7 +120,7 @@ public class Roll extends AcrobaticsSubSkill {
      * @param player target player
      */
     @Override
-    public void addStats(ComponentBuilder componentBuilder, Player player) {
+    public void addStats(TextComponent.Builder componentBuilder, Player player) {
         String rollChance, rollChanceLucky, gracefulRollChance, gracefulRollChanceLucky;
 
         /* Values related to the player */
@@ -149,21 +147,21 @@ public class Roll extends AcrobaticsSubSkill {
         componentBuilder.append("\n");*/
 
         //Acrobatics.SubSkill.Roll.Chance
-        componentBuilder.append(LocaleLoader.getString("Acrobatics.SubSkill.Roll.Chance", rollChance) + (isLucky ? LocaleLoader.getString("Perks.Lucky.Bonus", rollChanceLucky) : ""));
-        componentBuilder.append("\n");
-        componentBuilder.append(LocaleLoader.getString("Acrobatics.SubSkill.Roll.GraceChance", gracefulRollChance) + (isLucky ? LocaleLoader.getString("Perks.Lucky.Bonus", gracefulRollChanceLucky) : ""));
+        componentBuilder.append(Component.text(LocaleLoader.getString("Acrobatics.SubSkill.Roll.Chance", rollChance) + (isLucky ? LocaleLoader.getString("Perks.Lucky.Bonus", rollChanceLucky) : "")));
+        componentBuilder.append(Component.newline());
+        componentBuilder.append(Component.text(LocaleLoader.getString("Acrobatics.SubSkill.Roll.GraceChance", gracefulRollChance) + (isLucky ? LocaleLoader.getString("Perks.Lucky.Bonus", gracefulRollChanceLucky) : "")));
         //Activation Tips
-        componentBuilder.append("\n").append(LocaleLoader.getString("JSON.Hover.Tips")).append("\n");
-        componentBuilder.append(getTips());
-        componentBuilder.append("\n");
+        componentBuilder.append(Component.newline()).append(Component.text(LocaleLoader.getString("JSON.Hover.Tips"))).append(Component.newline());
+        componentBuilder.append(Component.text(getTips()));
+        componentBuilder.append(Component.newline());
         //Advanced
 
         //Lucky Notice
         if(isLucky)
         {
-            componentBuilder.append(LocaleLoader.getString("JSON.JWrapper.Perks.Header"));
-            componentBuilder.append("\n");
-            componentBuilder.append(LocaleLoader.getString("JSON.JWrapper.Perks.Lucky", "33"));
+            componentBuilder.append(Component.text(LocaleLoader.getString("JSON.JWrapper.Perks.Header")));
+            componentBuilder.append(Component.newline());
+            componentBuilder.append(Component.text(LocaleLoader.getString("JSON.JWrapper.Perks.Lucky", "33")));
         }
 
     }
@@ -201,7 +199,7 @@ public class Roll extends AcrobaticsSubSkill {
             return gracefulRollCheck(player, mcMMOPlayer, damage, skillLevel);
         }
 
-        double modifiedDamage = calculateModifiedRollDamage(damage, AdvancedConfig.getInstance().getRollDamageThreshold());
+        double modifiedDamage = calculateModifiedRollDamage(damage, mcMMO.p.getAdvancedConfig().getRollDamageThreshold());
 
         if (!isFatal(player, modifiedDamage)
                 && RandomChanceUtil.isActivationSuccessful(SkillActivationType.RANDOM_LINEAR_100_SCALE_WITH_CAP, SubSkillType.ACROBATICS_ROLL, player)) {
@@ -210,7 +208,7 @@ public class Roll extends AcrobaticsSubSkill {
             //player.sendMessage(LocaleLoader.getString("Acrobatics.Roll.Text"));
 
             //if (!SkillUtils.cooldownExpired((long) mcMMOPlayer.getTeleportATS(), Config.getInstance().getXPAfterTeleportCooldown())) {
-            if(!isExploiting(player))
+            if(!isExploiting(player) && mcMMOPlayer.getAcrobaticsManager().canGainRollXP())
                 SkillUtils.applyXpGain(mcMMOPlayer, getPrimarySkill(), calculateRollXP(player, damage, true), XPGainReason.PVE);
             //}
 
@@ -219,7 +217,7 @@ public class Roll extends AcrobaticsSubSkill {
         }
         else if (!isFatal(player, damage)) {
             //if (!SkillUtils.cooldownExpired((long) mcMMOPlayer.getTeleportATS(), Config.getInstance().getXPAfterTeleportCooldown())) {
-            if(!isExploiting(player))
+            if(!isExploiting(player) && mcMMOPlayer.getAcrobaticsManager().canGainRollXP())
                 SkillUtils.applyXpGain(mcMMOPlayer, getPrimarySkill(), calculateRollXP(player, damage, false), XPGainReason.PVE);
             //}
         }
@@ -239,7 +237,7 @@ public class Roll extends AcrobaticsSubSkill {
      * @return the modified event damage if the ability was successful, the original event damage otherwise
      */
     private double gracefulRollCheck(Player player, McMMOPlayer mcMMOPlayer, double damage, int skillLevel) {
-        double modifiedDamage = calculateModifiedRollDamage(damage, AdvancedConfig.getInstance().getRollDamageThreshold() * 2);
+        double modifiedDamage = calculateModifiedRollDamage(damage, mcMMO.p.getAdvancedConfig().getRollDamageThreshold() * 2);
 
         RandomChanceSkill rcs = new RandomChanceSkill(player, subSkillType);
         rcs.setSkillLevel(rcs.getSkillLevel() * 2); //Double the effective odds
@@ -249,14 +247,14 @@ public class Roll extends AcrobaticsSubSkill {
         {
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE, "Acrobatics.Ability.Proc");
             SoundManager.sendCategorizedSound(player, player.getLocation(), SoundType.ROLL_ACTIVATED, SoundCategory.PLAYERS,0.5F);
-            if(!isExploiting(player))
+            if(!isExploiting(player) && mcMMOPlayer.getAcrobaticsManager().canGainRollXP())
                 SkillUtils.applyXpGain(mcMMOPlayer, getPrimarySkill(), calculateRollXP(player, damage, true), XPGainReason.PVE);
 
             addFallLocation(player);
             return modifiedDamage;
         }
         else if (!isFatal(player, damage)) {
-            if(!isExploiting(player))
+            if(!isExploiting(player) && mcMMOPlayer.getAcrobaticsManager().canGainRollXP())
                 SkillUtils.applyXpGain(mcMMOPlayer, getPrimarySkill(), calculateRollXP(player, damage, false), XPGainReason.PVE);
             
             addFallLocation(player);
@@ -272,36 +270,35 @@ public class Roll extends AcrobaticsSubSkill {
      * @return true if exploits are detected, false otherwise
      */
     private boolean isExploiting(Player player) {
-        if (!Config.getInstance().getAcrobaticsPreventAFK()) {
+        if (!ExperienceConfig.getInstance().isAcrobaticsExploitingPrevented()) {
             return false;
         }
 
-        if (player.getInventory().getItemInMainHand().getType() == Material.ENDER_PEARL || player.isInsideVehicle()) {
+        McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+
+        if (ItemUtils.hasItemInEitherHand(player, Material.ENDER_PEARL) || player.isInsideVehicle()) {
+            if(mcMMOPlayer.isDebugMode()) {
+                mcMMOPlayer.getPlayer().sendMessage("Acrobatics XP Prevented: Ender Pearl or Inside Vehicle");
+            }
             return true;
         }
 
-        if(fallLocationMap.get(player) == null)
-            fallLocationMap.put(player, new LimitedSizeList(50));
+        if(UserManager.getPlayer(player).getAcrobaticsManager().hasFallenInLocationBefore(getBlockLocation(player)))
+        {
+            if(mcMMOPlayer.isDebugMode()) {
+                mcMMOPlayer.getPlayer().sendMessage("Acrobatics XP Prevented: Fallen in location before");
+            }
 
-        LimitedSizeList fallLocations = fallLocationMap.get(player);
-        
-        if(fallLocations.contains(getBlockLocation(player)))
             return true;
+        }
 
         return false; //NOT EXPLOITING
-/*
-        Location fallLocation = player.getLocation();
-        int maxTries = Config.getInstance().getAcrobaticsAFKMaxTries();
-
-        boolean sameLocation = (lastFallLocation != null && Misc.isNear(lastFallLocation, fallLocation, 2));
-
-        fallTries = sameLocation ? Math.min(fallTries + 1, maxTries) : Math.max(fallTries - 1, 0);
-        lastFallLocation = fallLocation;
-
-        return fallTries + 1 > maxTries;*/
     }
 
     private float calculateRollXP(Player player, double damage, boolean isRoll) {
+        //Clamp Damage to account for insane DRs
+        damage = Math.min(20, damage);
+
         ItemStack boots = player.getInventory().getBoots();
         float xp = (float) (damage * (isRoll ? ExperienceConfig.getInstance().getRollXPModifier() : ExperienceConfig.getInstance().getFallXPModifier()));
 
@@ -344,7 +341,7 @@ public class Roll extends AcrobaticsSubSkill {
         //player.sendMessage(getDescription());
         //Player stats
         player.sendMessage(LocaleLoader.getString("Commands.MmoInfo.Stats",
-                            LocaleLoader.getString("Acrobatics.SubSkill.Roll.Stats", getStats(player)[0], getStats(player)[1])));
+                            LocaleLoader.getString("Acrobatics.SubSkill.Roll.Stats", getStats(player))));
 
         //Mechanics
         player.sendMessage(LocaleLoader.getString("Commands.MmoInfo.Mechanics"));
@@ -364,6 +361,9 @@ public class Roll extends AcrobaticsSubSkill {
         //1 = chance to roll with grace at half max level
         //2 = level where maximum bonus is reached
         //3 = additive chance to succeed per level
+        //4 = damage threshold when rolling
+        //5 = damage threshold when rolling with grace
+        //6 = half of level where maximum bonus is reached
         /*
         Roll:
             # ChanceMax: Maximum chance of rolling when on <MaxBonusLevel> or higher
@@ -373,31 +373,34 @@ public class Roll extends AcrobaticsSubSkill {
             MaxBonusLevel: 100
             DamageThreshold: 7.0
          */
-        double rollChanceHalfMax, graceChanceHalfMax, damageThreshold, chancePerLevel;
 
-        //Chance to roll at half max skill
-        RandomChanceSkill rollHalfMaxSkill = new RandomChanceSkill(null, subSkillType);
-        int halfMaxSkillValue = mcMMO.isRetroModeEnabled() ? 500 : 50;
-        rollHalfMaxSkill.setSkillLevel(halfMaxSkillValue);
-
-        //Chance to graceful roll at full skill
-        RandomChanceSkill rollGraceHalfMaxSkill = new RandomChanceSkill(null, subSkillType);
-        rollGraceHalfMaxSkill.setSkillLevel(halfMaxSkillValue * 2); //Double the effective odds
-
-        //Chance to roll per level
-        RandomChanceSkill rollOneSkillLevel = new RandomChanceSkill(null, subSkillType);
-        rollGraceHalfMaxSkill.setSkillLevel(1); //Level 1 skill
-
-        //Chance Stat Calculations
-        rollChanceHalfMax       = RandomChanceUtil.getRandomChanceExecutionChance(rollHalfMaxSkill);
-        graceChanceHalfMax      = RandomChanceUtil.getRandomChanceExecutionChance(rollGraceHalfMaxSkill);
-        damageThreshold         = AdvancedConfig.getInstance().getRollDamageThreshold();
-
-        chancePerLevel          = RandomChanceUtil.getRandomChanceExecutionChance(rollOneSkillLevel);
-
-        double maxLevel         = AdvancedConfig.getInstance().getMaxBonusLevel(SubSkillType.ACROBATICS_ROLL);
-
-        return LocaleLoader.getString("Acrobatics.SubSkill.Roll.Mechanics", rollChanceHalfMax, graceChanceHalfMax, maxLevel, chancePerLevel, damageThreshold, damageThreshold * 2);
+        return "Under Construction: This will work in a future update.";
+//
+//        double rollChanceHalfMax, graceChanceHalfMax, damageThreshold, chancePerLevel;
+//
+//        //Chance to roll at half max skill
+//        RandomChanceSkill rollHalfMaxSkill = new RandomChanceSkill(null, subSkillType);
+//        int halfMaxSkillValue = mcMMO.p.getAdvancedConfig().getMaxBonusLevel(SubSkillType.ACROBATICS_ROLL)/2;
+//        rollHalfMaxSkill.setSkillLevel(halfMaxSkillValue);
+//
+//        //Chance to graceful roll at full skill
+//        RandomChanceSkill rollGraceHalfMaxSkill = new RandomChanceSkill(null, subSkillType);
+//        rollGraceHalfMaxSkill.setSkillLevel(halfMaxSkillValue * 2); //Double the effective odds
+//
+//        //Chance to roll per level
+//        RandomChanceSkill rollOneSkillLevel = new RandomChanceSkill(null, subSkillType);
+//        rollGraceHalfMaxSkill.setSkillLevel(1); //Level 1 skill
+//
+//        //Chance Stat Calculations
+//        rollChanceHalfMax       = RandomChanceUtil.getRandomChanceExecutionChance(rollHalfMaxSkill);
+//        graceChanceHalfMax      = RandomChanceUtil.getRandomChanceExecutionChance(rollGraceHalfMaxSkill);
+//        damageThreshold         = mcMMO.p.getAdvancedConfig().getRollDamageThreshold();
+//
+//        chancePerLevel          = RandomChanceUtil.getRandomChanceExecutionChance(rollOneSkillLevel);
+//
+//        double maxLevel         = mcMMO.p.getAdvancedConfig().getMaxBonusLevel(SubSkillType.ACROBATICS_ROLL);
+//
+//        return LocaleLoader.getString("Acrobatics.SubSkill.Roll.Mechanics", rollChanceHalfMax, graceChanceHalfMax, maxLevel, chancePerLevel, damageThreshold, damageThreshold * 2,halfMaxSkillValue);
     }
 
     /**
@@ -420,23 +423,17 @@ public class Roll extends AcrobaticsSubSkill {
         playerChanceRoll        = RandomChanceUtil.getRandomChanceExecutionChance(roll);
         playerChanceGrace       = RandomChanceUtil.getRandomChanceExecutionChance(graceful);
 
-        Double[] stats = { playerChanceRoll, playerChanceGrace }; //DEBUG
-        return stats;
+        return new Double[]{ playerChanceRoll, playerChanceGrace };
     }
 
     public void addFallLocation(Player player)
     {
-        if(fallLocationMap.get(player) == null)
-            fallLocationMap.put(player, new LimitedSizeList(50));
-
-        LimitedSizeList fallLocations = fallLocationMap.get(player);
-
-        Location loc = getBlockLocation(player);
-        fallLocations.add(loc);
+        UserManager.getPlayer(player).getAcrobaticsManager().addLocationToFallMap(getBlockLocation(player));
     }
 
     public Location getBlockLocation(Player player)
     {
         return player.getLocation().getBlock().getLocation();
     }
+
 }

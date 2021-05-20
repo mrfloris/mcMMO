@@ -1,53 +1,42 @@
 package com.gmail.nossr50.skills.taming;
 
-import com.gmail.nossr50.config.Config;
+import com.gmail.nossr50.datatypes.skills.subskills.taming.CallOfTheWildType;
 import com.gmail.nossr50.mcMMO;
 import com.gmail.nossr50.util.Misc;
-import com.gmail.nossr50.util.skills.CombatUtils;
-import com.gmail.nossr50.util.skills.ParticleEffectUtils;
-import org.bukkit.Location;
-import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 public class TrackedTamingEntity extends BukkitRunnable {
-    private LivingEntity livingEntity;
-    private UUID id;
-    private int length;
+    private final @NotNull LivingEntity livingEntity;
+    private final @NotNull CallOfTheWildType callOfTheWildType;
+    private final @NotNull Player player;
 
-    protected TrackedTamingEntity(LivingEntity livingEntity) {
+    protected TrackedTamingEntity(@NotNull LivingEntity livingEntity, @NotNull CallOfTheWildType callOfTheWildType, @NotNull Player player) {
+        this.player = player;
+        this.callOfTheWildType = callOfTheWildType;
         this.livingEntity = livingEntity;
-        this.id = livingEntity.getUniqueId();
 
-        int tamingCOTWLength = Config.getInstance().getTamingCOTWLength(livingEntity.getType());
+        int tamingCOTWLength = mcMMO.p.getGeneralConfig().getTamingCOTWLength(callOfTheWildType.getConfigEntityTypeEntry());
 
         if (tamingCOTWLength > 0) {
-            this.length = tamingCOTWLength * Misc.TICK_CONVERSION_FACTOR;
+            int length = tamingCOTWLength * Misc.TICK_CONVERSION_FACTOR;
             this.runTaskLater(mcMMO.p, length);
         }
     }
 
     @Override
     public void run() {
-        if (livingEntity.isValid()) {
-            Location location = livingEntity.getLocation();
-            location.getWorld().playSound(location, Sound.BLOCK_FIRE_EXTINGUISH, 0.8F, 0.8F);
-            ParticleEffectUtils.playCallOfTheWildEffect(livingEntity);
-            CombatUtils.dealDamage(livingEntity, livingEntity.getMaxHealth(), DamageCause.SUICIDE, livingEntity);
-        }
-
-        TamingManager.removeFromTracker(this);
+        mcMMO.getTransientEntityTracker().removeSummon(this.getLivingEntity(), player, true);
         this.cancel();
     }
 
-    protected LivingEntity getLivingEntity() {
-        return livingEntity;
+    public @NotNull CallOfTheWildType getCallOfTheWildType() {
+        return callOfTheWildType;
     }
 
-    protected UUID getID() {
-        return id;
+    public @NotNull LivingEntity getLivingEntity() {
+        return livingEntity;
     }
 }

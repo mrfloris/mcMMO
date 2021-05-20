@@ -14,6 +14,8 @@ public enum SoundType {
     ABILITY_ACTIVATED_GENERIC,
     ABILITY_ACTIVATED_BERSERK,
     BLEED,
+    GLASS,
+    ITEM_CONSUMED,
     TIRED;
 
     public boolean usesCustomPitch()

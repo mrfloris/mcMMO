@@ -1,7 +1,7 @@
 package com.gmail.nossr50.skills.salvage;
 
-import com.gmail.nossr50.config.AdvancedConfig;
-import com.gmail.nossr50.config.Config;
+import com.gmail.nossr50.api.ItemSpawnReason;
+import com.gmail.nossr50.config.experience.ExperienceConfig;
 import com.gmail.nossr50.datatypes.interactions.NotificationType;
 import com.gmail.nossr50.datatypes.player.McMMOPlayer;
 import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
@@ -13,7 +13,6 @@ import com.gmail.nossr50.skills.salvage.salvageables.Salvageable;
 import com.gmail.nossr50.util.EventUtils;
 import com.gmail.nossr50.util.Misc;
 import com.gmail.nossr50.util.Permissions;
-import com.gmail.nossr50.util.StringUtils;
 import com.gmail.nossr50.util.player.NotificationManager;
 import com.gmail.nossr50.util.random.RandomChanceSkillStatic;
 import com.gmail.nossr50.util.random.RandomChanceUtil;
@@ -21,12 +20,15 @@ import com.gmail.nossr50.util.skills.RankUtils;
 import com.gmail.nossr50.util.skills.SkillUtils;
 import com.gmail.nossr50.util.sounds.SoundManager;
 import com.gmail.nossr50.util.sounds.SoundType;
+import com.gmail.nossr50.util.text.StringUtils;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,11 +51,11 @@ public class SalvageManager extends SkillManager {
             return;
         }
 
-        if (Config.getInstance().getSalvageAnvilMessagesEnabled()) {
+        if (mcMMO.p.getGeneralConfig().getSalvageAnvilMessagesEnabled()) {
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE, "Salvage.Listener.Anvil");
         }
 
-        if (Config.getInstance().getSalvageAnvilPlaceSoundsEnabled()) {
+        if (mcMMO.p.getGeneralConfig().getSalvageAnvilPlaceSoundsEnabled()) {
             SoundManager.sendSound(player, player.getLocation(), SoundType.ANVIL);
         }
 
@@ -64,8 +66,9 @@ public class SalvageManager extends SkillManager {
         Player player = getPlayer();
 
         Salvageable salvageable = mcMMO.getSalvageableManager().getSalvageable(item.getType());
-
-        if (item.getItemMeta().isUnbreakable()) {
+        ItemMeta meta = item.getItemMeta();
+        
+        if (meta != null && meta.isUnbreakable()) {
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Anvil.Unbreakable");
             return;
         }
@@ -81,32 +84,27 @@ public class SalvageManager extends SkillManager {
             return;
         }
 
-        /*int skillLevel = getSkillLevel();
-        int minimumSalvageableLevel = salvageable.getMinimumLevel();*/
+        /*int skillLevel = getSkillLevel();*/
+        int minimumSalvageableLevel = salvageable.getMinimumLevel();
 
         // Level check
-        if (!RankUtils.hasUnlockedSubskill(player, SubSkillType.SALVAGE_ARCANE_SALVAGE)) {
-            NotificationManager.sendPlayerInformation(player, NotificationType.REQUIREMENTS_NOT_MET, "Salvage.Skills.Adept.Level", String.valueOf(RankUtils.getUnlockLevel(SubSkillType.SALVAGE_ARCANE_SALVAGE)), StringUtils.getPrettyItemString(item.getType()));
+        if (getSkillLevel() < minimumSalvageableLevel) {
+            NotificationManager.sendPlayerInformation(player, NotificationType.REQUIREMENTS_NOT_MET,
+                    "Salvage.Skills.Adept.Level",
+                    String.valueOf(minimumSalvageableLevel), StringUtils.getPrettyItemString(item.getType()));
             return;
         }
 
-        if (item.getDurability() != 0 && (!RankUtils.hasUnlockedSubskill(player, SubSkillType.SALVAGE_ADVANCED_SALVAGE) || !Permissions.advancedSalvage(player))) {
-            NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.Adept.Damaged");
-            return;
-        }
+        int durability = meta instanceof Damageable ? ((Damageable) meta).getDamage(): 0;
+        int potentialSalvageYield = Salvage.calculateSalvageableAmount(durability, salvageable.getMaximumDurability(), salvageable.getMaximumQuantity());
 
-        int salvageableAmount = Salvage.calculateSalvageableAmount(item.getDurability(), salvageable.getMaximumDurability(), salvageable.getMaximumQuantity());
-
-        if (salvageableAmount == 0) {
+        if (potentialSalvageYield <= 0) {
             NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.TooDamaged");
-            player.sendMessage(LocaleLoader.getString("Salvage.Skills.TooDamaged"));
             return;
         }
 
-        salvageableAmount = Math.min(salvageableAmount, getSalvageableAmount()); // Always get at least something back, if you're capable of salvaging it.
+        potentialSalvageYield = Math.min(potentialSalvageYield, getSalvageLimit()); // Always get at least something back, if you're capable of salvaging it.
 
-
-        player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
         location.add(0.5, 1, 0.5);
 
         Map<Enchantment, Integer> enchants = item.getEnchantments();
@@ -116,25 +114,60 @@ public class SalvageManager extends SkillManager {
             enchantBook = arcaneSalvageCheck(enchants);
         }
 
-        ItemStack salvageResults = new ItemStack(salvageable.getSalvageMaterial(), salvageableAmount);
+        //Lottery on Salvageable Amount
+
+        int lotteryResults = 1;
+        int chanceOfSuccess = 99;
+
+        for(int x = 0; x < potentialSalvageYield-1; x++) {
+
+            if(RandomChanceUtil.rollDice(chanceOfSuccess, 100)) {
+                chanceOfSuccess-=3;
+                chanceOfSuccess = Math.max(chanceOfSuccess, 90);
+
+                lotteryResults+=1;
+            }
+        }
+
+        if(lotteryResults == potentialSalvageYield && potentialSalvageYield != 1 && RankUtils.isPlayerMaxRankInSubSkill(player, SubSkillType.SALVAGE_ARCANE_SALVAGE)) {
+            NotificationManager.sendPlayerInformationChatOnly(player, "Salvage.Skills.Lottery.Perfect", String.valueOf(lotteryResults), StringUtils.getPrettyItemString(item.getType()));
+        } else if(salvageable.getMaximumQuantity() == 1 || getSalvageLimit() >= salvageable.getMaximumQuantity()) {
+            NotificationManager.sendPlayerInformationChatOnly(player,  "Salvage.Skills.Lottery.Normal", String.valueOf(lotteryResults), StringUtils.getPrettyItemString(item.getType()));
+        } else {
+            NotificationManager.sendPlayerInformationChatOnly(player,  "Salvage.Skills.Lottery.Untrained", String.valueOf(lotteryResults), StringUtils.getPrettyItemString(item.getType()));
+        }
+
+        ItemStack salvageResults = new ItemStack(salvageable.getSalvageMaterial(), lotteryResults);
 
         //Call event
         if (EventUtils.callSalvageCheckEvent(player, item, salvageResults, enchantBook).isCancelled()) {
             return;
         }
 
+        player.getInventory().setItemInMainHand(new ItemStack(Material.AIR));
+
+        Location anvilLoc = location.clone();
+        Location playerLoc = player.getLocation().clone();
+        double distance = anvilLoc.distance(playerLoc);
+
+        double speedLimit = .6;
+        double minSpeed = .3;
+
+        //Clamp the speed and vary it by distance
+        double vectorSpeed = Math.min(speedLimit, Math.max(minSpeed, distance * .2));
+
+        //Add a very small amount of height
+        anvilLoc.add(0, .1, 0);
+
         if (enchantBook != null) {
-            Misc.dropItem(location, enchantBook);
+            Misc.spawnItemTowardsLocation(anvilLoc.clone(), playerLoc.clone(), enchantBook, vectorSpeed, ItemSpawnReason.SALVAGE_ENCHANTMENT_BOOK);
         }
 
-        Misc.dropItems(location, salvageResults, 1);
+        Misc.spawnItemTowardsLocation(anvilLoc.clone(), playerLoc.clone(), salvageResults, vectorSpeed, ItemSpawnReason.SALVAGE_MATERIALS);
 
         // BWONG BWONG BWONG - CLUNK!
-        if (Config.getInstance().getSalvageAnvilUseSoundsEnabled()) {
-            SoundManager.sendSound(player, player.getLocation(), SoundType.ANVIL);
+        if (mcMMO.p.getGeneralConfig().getSalvageAnvilUseSoundsEnabled()) {
             SoundManager.sendSound(player, player.getLocation(), SoundType.ITEM_BREAK);
-
-            //player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1.0F, 1.0F);
         }
 
         NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE, "Salvage.Skills.Success");
@@ -144,8 +177,8 @@ public class SalvageManager extends SkillManager {
         return Math.min((((Salvage.salvageMaxPercentage / Salvage.salvageMaxPercentageLevel) * getSkillLevel()) / 100.0D), Salvage.salvageMaxPercentage / 100.0D);
     }*/
 
-    public int getSalvageableAmount() {
-        return (RankUtils.getRank(getPlayer(), SubSkillType.SALVAGE_ARCANE_SALVAGE) * 1);
+    public int getSalvageLimit() {
+        return (RankUtils.getRank(getPlayer(), SubSkillType.SALVAGE_SCRAP_COLLECTOR));
     }
 
     /**
@@ -182,18 +215,21 @@ public class SalvageManager extends SkillManager {
     }*/
 
     public double getExtractFullEnchantChance() {
-        return AdvancedConfig.getInstance().getArcaneSalvageExtractFullEnchantsChance(getArcaneSalvageRank());
+        if(Permissions.hasSalvageEnchantBypassPerk(getPlayer()))
+            return 100.0D;
+
+        return mcMMO.p.getAdvancedConfig().getArcaneSalvageExtractFullEnchantsChance(getArcaneSalvageRank());
     }
 
     public double getExtractPartialEnchantChance() {
-        return AdvancedConfig.getInstance().getArcaneSalvageExtractPartialEnchantsChance(getArcaneSalvageRank());
+        return mcMMO.p.getAdvancedConfig().getArcaneSalvageExtractPartialEnchantsChance(getArcaneSalvageRank());
     }
 
     private ItemStack arcaneSalvageCheck(Map<Enchantment, Integer> enchants) {
         Player player = getPlayer();
 
         if (!RankUtils.hasUnlockedSubskill(player, SubSkillType.SALVAGE_ARCANE_SALVAGE) || !Permissions.arcaneSalvage(player)) {
-            NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.ArcaneFailed");
+            NotificationManager.sendPlayerInformationChatOnly(player, "Salvage.Skills.ArcaneFailed");
             return null;
         }
 
@@ -201,46 +237,48 @@ public class SalvageManager extends SkillManager {
         EnchantmentStorageMeta enchantMeta = (EnchantmentStorageMeta) book.getItemMeta();
 
         boolean downgraded = false;
-        boolean arcaneFailure = false;
+        int arcaneFailureCount = 0;
 
         for (Entry<Enchantment, Integer> enchant : enchants.entrySet()) {
-            if (!Salvage.arcaneSalvageEnchantLoss
-                    || RandomChanceUtil.checkRandomChanceExecutionSuccess(new RandomChanceSkillStatic(getExtractFullEnchantChance(), getPlayer(), SubSkillType.SALVAGE_ARCANE_SALVAGE))) {
-                enchantMeta.addStoredEnchant(enchant.getKey(), enchant.getValue(), true);
+
+            int enchantLevel = enchant.getValue();
+
+            if(!ExperienceConfig.getInstance().allowUnsafeEnchantments()) {
+                if(enchantLevel > enchant.getKey().getMaxLevel()) {
+                    enchantLevel = enchant.getKey().getMaxLevel();
+                }
             }
-            else if (enchant.getValue() > 1
+
+            if (!Salvage.arcaneSalvageEnchantLoss
+                    || Permissions.hasSalvageEnchantBypassPerk(player)
+                    || RandomChanceUtil.checkRandomChanceExecutionSuccess(new RandomChanceSkillStatic(getExtractFullEnchantChance(), getPlayer(), SubSkillType.SALVAGE_ARCANE_SALVAGE))) {
+                enchantMeta.addStoredEnchant(enchant.getKey(), enchantLevel, true);
+            }
+            else if (enchantLevel > 1
                     && Salvage.arcaneSalvageDowngrades
                     && RandomChanceUtil.checkRandomChanceExecutionSuccess(new RandomChanceSkillStatic(getExtractPartialEnchantChance(), getPlayer(), SubSkillType.SALVAGE_ARCANE_SALVAGE))) {
-                enchantMeta.addStoredEnchant(enchant.getKey(), enchant.getValue() - 1, true);
+                enchantMeta.addStoredEnchant(enchant.getKey(), enchantLevel - 1, true);
                 downgraded = true;
-            }
-            else {
-                arcaneFailure = true;
-                downgraded = true;
+            } else {
+                arcaneFailureCount++;
             }
         }
 
-        if(!arcaneFailure)
+        if(failedAllEnchants(arcaneFailureCount, enchants.entrySet().size()))
         {
-            Map<Enchantment, Integer> newEnchants = enchantMeta.getStoredEnchants();
-
-            if (downgraded || newEnchants.size() < enchants.size()) {
-                NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.ArcanePartial");
-            }
-            else {
-                NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.ArcanePartial");
-            }
-
-            book.setItemMeta(enchantMeta);
-        } else {
-            if(enchantMeta.getStoredEnchants().size() > 0)
-            {
-                NotificationManager.sendPlayerInformation(player, NotificationType.SUBSKILL_MESSAGE_FAILED, "Salvage.Skills.ArcaneFailed");
-            }
+            NotificationManager.sendPlayerInformationChatOnly(player,  "Salvage.Skills.ArcaneFailed");
             return null;
+        } else if(downgraded)
+        {
+            NotificationManager.sendPlayerInformationChatOnly(player,  "Salvage.Skills.ArcanePartial");
         }
 
+        book.setItemMeta(enchantMeta);
         return book;
+    }
+
+    private boolean failedAllEnchants(int arcaneFailureCount, int size) {
+        return arcaneFailureCount == size;
     }
 
     /**
@@ -253,7 +291,7 @@ public class SalvageManager extends SkillManager {
         Player player = getPlayer();
         long lastUse = getLastAnvilUse();
 
-        if (!SkillUtils.cooldownExpired(lastUse, 3) || !Config.getInstance().getSalvageConfirmRequired()) {
+        if (!SkillUtils.cooldownExpired(lastUse, 3) || !mcMMO.p.getGeneralConfig().getSalvageConfirmRequired()) {
             return true;
         }
 

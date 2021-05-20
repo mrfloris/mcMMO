@@ -9,18 +9,14 @@ import org.bukkit.event.Event;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 
 public class InteractionManager {
     private static HashMap<InteractType, ArrayList<Interaction>> interactRegister;
     private static HashMap<String, AbstractSubSkill> subSkillNameMap; //Used for mmoinfo optimization
     private static ArrayList<AbstractSubSkill> subSkillList;
 
-    /**
-     * Registers subskills with the Interaction registration
-     * @param abstractSubSkill the target subskill to register
-     */
-    public static void registerSubSkill(AbstractSubSkill abstractSubSkill)
-    {
+    public static void initMaps() {
         /* INIT MAPS */
         if(interactRegister == null)
             interactRegister = new HashMap<>();
@@ -30,14 +26,20 @@ public class InteractionManager {
 
         if(subSkillNameMap == null)
             subSkillNameMap = new HashMap<>();
+    }
 
+    /**
+     * Registers subskills with the Interaction registration
+     * @param abstractSubSkill the target subskill to register
+     */
+    public static void registerSubSkill(AbstractSubSkill abstractSubSkill)
+    {
         //Store a unique copy of each subskill
         if(!subSkillList.contains(abstractSubSkill))
             subSkillList.add(abstractSubSkill);
 
         //Init ArrayList
-        if(interactRegister.get(abstractSubSkill.getInteractType()) == null)
-            interactRegister.put(abstractSubSkill.getInteractType(), new ArrayList<>());
+        interactRegister.computeIfAbsent(abstractSubSkill.getInteractType(), k -> new ArrayList<>());
 
         //Registration array reference
         ArrayList<Interaction> arrayRef = interactRegister.get(abstractSubSkill.getInteractType());
@@ -45,13 +47,12 @@ public class InteractionManager {
         //Register skill
         arrayRef.add(abstractSubSkill);
 
-        String lowerCaseName = abstractSubSkill.getConfigKeyName().toLowerCase();
+        String lowerCaseName = abstractSubSkill.getConfigKeyName().toLowerCase(Locale.ENGLISH);
 
         //Register in name map
-        if(subSkillNameMap.get(lowerCaseName) == null)
-            subSkillNameMap.put(lowerCaseName, abstractSubSkill);
+        subSkillNameMap.putIfAbsent(lowerCaseName, abstractSubSkill);
 
-        System.out.println("[mcMMO] registered subskill: "+ abstractSubSkill.getConfigKeyName());
+        mcMMO.p.getLogger().info("Registered subskill: "+ abstractSubSkill.getConfigKeyName());
     }
 
     /**
@@ -62,7 +63,7 @@ public class InteractionManager {
      */
     public static AbstractSubSkill getAbstractByName(String name)
     {
-        return subSkillNameMap.get(name.toLowerCase());
+        return subSkillNameMap.get(name.toLowerCase(Locale.ENGLISH));
     }
 
     /**
@@ -73,6 +74,9 @@ public class InteractionManager {
      */
     public static void processEvent(Event event, mcMMO plugin, InteractType curInteractType)
     {
+        if(interactRegister.get(curInteractType) == null)
+            return;
+
         for(Interaction interaction : interactRegister.get(curInteractType))
         {
             interaction.doInteraction(event, plugin);

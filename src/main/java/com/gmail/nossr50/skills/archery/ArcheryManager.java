@@ -9,7 +9,6 @@ import com.gmail.nossr50.skills.SkillManager;
 import com.gmail.nossr50.util.Misc;
 import com.gmail.nossr50.util.Permissions;
 import com.gmail.nossr50.util.player.NotificationManager;
-import com.gmail.nossr50.util.player.UserManager;
 import com.gmail.nossr50.util.random.RandomChanceUtil;
 import com.gmail.nossr50.util.skills.RankUtils;
 import com.gmail.nossr50.util.skills.SkillActivationType;
@@ -17,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -50,11 +50,18 @@ public class ArcheryManager extends SkillManager {
      * Calculate bonus XP awarded for Archery when hitting a far-away target.
      *
      * @param target The {@link LivingEntity} damaged by the arrow
-     * @param damager The {@link Entity} who shot the arrow
+     * @param arrow The {@link Entity} who shot the arrow
      */
-    public double distanceXpBonusMultiplier(LivingEntity target, Entity damager) {
-        Location firedLocation = (Location) damager.getMetadata(mcMMO.arrowDistanceKey).get(0).value();
+    public double distanceXpBonusMultiplier(LivingEntity target, Entity arrow) {
+        //Hacky Fix - some plugins spawn arrows and assign them to players after the ProjectileLaunchEvent fires
+        if(!arrow.hasMetadata(mcMMO.arrowDistanceKey))
+            return 1;
+
+        Location firedLocation = (Location) arrow.getMetadata(mcMMO.arrowDistanceKey).get(0).value();
         Location targetLocation = target.getLocation();
+
+        if(firedLocation == null || firedLocation.getWorld() == null)
+            return 1;
 
         if (firedLocation.getWorld() != targetLocation.getWorld()) {
             return 1;
@@ -68,9 +75,10 @@ public class ArcheryManager extends SkillManager {
      *
      * @param target The {@link LivingEntity} damaged by the arrow
      */
-    public void retrieveArrows(LivingEntity target) {
-        if (RandomChanceUtil.isActivationSuccessful(SkillActivationType.RANDOM_LINEAR_100_SCALE_WITH_CAP, SubSkillType.ARCHERY_ARROW_RETRIEVAL, getPlayer())) {
+    public void retrieveArrows(LivingEntity target, Projectile projectile) {
+        if(projectile.hasMetadata(mcMMO.trackedArrow)) {
             Archery.incrementTrackerValue(target);
+            projectile.removeMetadata(mcMMO.trackedArrow, mcMMO.p); //Only 1 entity per projectile
         }
     }
 
@@ -90,11 +98,12 @@ public class ArcheryManager extends SkillManager {
         defender.teleport(dazedLocation);
         defender.addPotionEffect(new PotionEffect(PotionEffectType.CONFUSION, 20 * 10, 10));
 
-        if (UserManager.getPlayer(defender).useChatNotifications()) {
+
+        if (NotificationManager.doesPlayerUseNotifications(defender)) {
             NotificationManager.sendPlayerInformation(defender, NotificationType.SUBSKILL_MESSAGE, "Combat.TouchedFuzzy");
         }
 
-        if (mcMMOPlayer.useChatNotifications()) {
+        if (mmoPlayer.useChatNotifications()) {
             NotificationManager.sendPlayerInformation(getPlayer(), NotificationType.SUBSKILL_MESSAGE, "Combat.TargetDazed");
         }
 

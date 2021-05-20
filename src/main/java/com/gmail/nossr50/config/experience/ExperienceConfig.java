@@ -5,8 +5,10 @@ import com.gmail.nossr50.datatypes.experience.FormulaType;
 import com.gmail.nossr50.datatypes.skills.MaterialType;
 import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
 import com.gmail.nossr50.datatypes.skills.alchemy.PotionStage;
-import com.gmail.nossr50.util.StringUtils;
+import com.gmail.nossr50.util.text.StringUtils;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -36,7 +38,7 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
 
     @Override
     protected boolean validateKeys() {
-        List<String> reason = new ArrayList<String>();
+        List<String> reason = new ArrayList<>();
 
         /*
          * FORMULA SETTINGS
@@ -87,18 +89,18 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
         /* Alchemy */
         for (PotionStage potionStage : PotionStage.values()) {
             if (getPotionXP(potionStage) < 0) {
-                reason.add("Experience.Alchemy.Potion_Stage_" + potionStage.toNumerical() + " should be at least 0!");
+                reason.add("Experience_Values.Alchemy.Potion_Stage_" + potionStage.toNumerical() + " should be at least 0!");
             }
         }
 
         /* Archery */
         if (getArcheryDistanceMultiplier() < 0) {
-            reason.add("Experience.Archery.Distance_Multiplier should be at least 0!");
+            reason.add("Experience_Values.Archery.Distance_Multiplier should be at least 0!");
         }
 
         /* Combat XP Multipliers */
         if (getAnimalsXP() < 0) {
-            reason.add("Experience.Combat.Multiplier.Animals should be at least 0!");
+            reason.add("Experience_Values.Combat.Multiplier.Animals should be at least 0!");
         }
 
         if (getDodgeXPModifier() < 0) {
@@ -117,32 +119,44 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
         // TODO: Add validation for each fish type once enum is available.
 
         if (getFishingShakeXP() <= 0) {
-            reason.add("Experience.Fishing.Shake should be greater than 0!");
+            reason.add("Experience_Values.Fishing.Shake should be greater than 0!");
         }
 
         /* Repair */
         if (getRepairXPBase() <= 0) {
-            reason.add("Experience.Repair.Base should be greater than 0!");
+            reason.add("Experience_Values.Repair.Base should be greater than 0!");
         }
 
         /* Taming */
         if (getTamingXP(EntityType.WOLF) <= 0) {
-            reason.add("Experience.Taming.Animal_Taming.Wolf should be greater than 0!");
+            reason.add("Experience_Values.Taming.Animal_Taming.Wolf should be greater than 0!");
         }
 
         if (getTamingXP(EntityType.OCELOT) <= 0) {
-            reason.add("Experience.Taming.Animal_Taming.Ocelot should be greater than 0!");
+            reason.add("Experience_Values.Taming.Animal_Taming.Ocelot should be greater than 0!");
         }
 
         return noErrorsInConfig(reason);
     }
+
+    public boolean isEarlyGameBoostEnabled() { return config.getBoolean("EarlyGameBoost.Enabled", true); }
 
     /*
      * FORMULA SETTINGS
      */
 
     /* EXPLOIT TOGGLES */
+    public boolean isSnowExploitPrevented() { return config.getBoolean("ExploitFix.SnowGolemExcavation", true); }
     public boolean isEndermanEndermiteFarmingPrevented() { return config.getBoolean("ExploitFix.EndermanEndermiteFarms", true); }
+    public boolean isPistonCheatingPrevented() { return config.getBoolean("ExploitFix.PistonCheating", true); }
+    public boolean isPistonExploitPrevented() { return config.getBoolean("ExploitFix.Pistons", false); }
+    public boolean allowUnsafeEnchantments() { return config.getBoolean("ExploitFix.UnsafeEnchantments", false); }
+    public boolean isCOTWBreedingPrevented() { return config.getBoolean("ExploitFix.COTWBreeding", true); }
+    public boolean isNPCInteractionPrevented() { return config.getBoolean("ExploitFix.PreventPluginNPCInteraction", true); }
+
+    public boolean isFishingExploitingPrevented() { return config.getBoolean("ExploitFix.Fishing", true); }
+    public boolean isAcrobaticsExploitingPrevented() { return config.getBoolean("ExploitFix.Acrobatics", true); }
+    public boolean isTreeFellerXPReduced() { return config.getBoolean("ExploitFix.TreeFellerReducedXP", true); }
 
     /* Curve settings */
     public FormulaType getFormulaType() { return FormulaType.getFormulaType(config.getString("Experience_Formula.Curve")); }
@@ -162,6 +176,9 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
 
     /* Spawned Mob modifier */
     public double getSpawnedMobXpMultiplier() { return config.getDouble("Experience_Formula.Mobspawners.Multiplier", 0.0); }
+    public double getEggXpMultiplier() { return config.getDouble("Experience_Formula.Eggs.Multiplier", 0.0); }
+    public double getTamedMobXpMultiplier() { return config.getDouble("Experience_Formula.Player_Tamed.Multiplier", 0.0); }
+    public double getNetherPortalXpMultiplier() { return config.getDouble("Experience_Formula.Nether_Portal.Multiplier", 0.0); }
     public double getBredMobXpMultiplier() { return config.getDouble("Experience_Formula.Breeding.Multiplier", 1.0); }
 
     /* Skill modifiers */
@@ -184,18 +201,58 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
      */
 
     /* General Settings */
-    public boolean getExperienceGainsPlayerVersusPlayerEnabled() { return config.getBoolean("Experience.PVP.Rewards", true); }
+    public boolean getExperienceGainsPlayerVersusPlayerEnabled() { return config.getBoolean("Experience_Values.PVP.Rewards", true); }
 
     /* Combat XP Multipliers */
-    public double getCombatXP(EntityType entity) { return config.getDouble("Experience.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_")); }
-    public double getAnimalsXP(EntityType entity) { return config.getDouble("Experience.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_"), getAnimalsXP()); }
-    public double getAnimalsXP() { return config.getDouble("Experience.Combat.Multiplier.Animals", 1.0); }
-    public boolean hasCombatXP(EntityType entity) {return config.contains("Experience.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_")); }
+    public double getCombatXP(EntityType entity) { return config.getDouble("Experience_Values.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_")); }
+    public double getAnimalsXP(EntityType entity) { return config.getDouble("Experience_Values.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_"), getAnimalsXP()); }
+    public double getAnimalsXP() { return config.getDouble("Experience_Values.Combat.Multiplier.Animals", 1.0); }
+    public boolean hasCombatXP(EntityType entity) {return config.contains("Experience_Values.Combat.Multiplier." + StringUtils.getPrettyEntityTypeString(entity).replace(" ", "_")); }
 
     /* Materials  */
-    public int getXp(PrimarySkillType skill, Material data)
+    public int getXp(PrimarySkillType skill, Material material)
     {
-        String baseString = "Experience." + StringUtils.getCapitalized(skill.toString()) + ".";
+        //TODO: Temporary measure to fix an exploit caused by a yet to be fixed Spigot bug (as of 7/3/2020)
+        if(material.toString().equalsIgnoreCase("LILY_PAD"))
+            return 0;
+
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
+        String explicitString = baseString + StringUtils.getExplicitConfigMaterialString(material);
+        if (config.contains(explicitString))
+            return config.getInt(explicitString);
+        String friendlyString = baseString + StringUtils.getFriendlyConfigMaterialString(material);
+        if (config.contains(friendlyString))
+            return config.getInt(friendlyString);
+        String wildcardString = baseString + StringUtils.getWildcardConfigMaterialString(material);
+        if (config.contains(wildcardString))
+            return config.getInt(wildcardString);
+        return 0;
+    }
+
+    /* Materials  */
+    public int getXp(PrimarySkillType skill, BlockState blockState)
+    {
+        Material data = blockState.getType();
+
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
+        String explicitString = baseString + StringUtils.getExplicitConfigMaterialString(data);
+        if (config.contains(explicitString))
+            return config.getInt(explicitString);
+        String friendlyString = baseString + StringUtils.getFriendlyConfigMaterialString(data);
+        if (config.contains(friendlyString))
+            return config.getInt(friendlyString);
+        String wildcardString = baseString + StringUtils.getWildcardConfigMaterialString(data);
+        if (config.contains(wildcardString))
+            return config.getInt(wildcardString);
+        return 0;
+    }
+
+    /* Materials  */
+    public int getXp(PrimarySkillType skill, Block block)
+    {
+        Material data = block.getType();
+
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
         String explicitString = baseString + StringUtils.getExplicitConfigMaterialString(data);
         if (config.contains(explicitString))
             return config.getInt(explicitString);
@@ -211,7 +268,7 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
     /* Materials  */
     public int getXp(PrimarySkillType skill, BlockData data)
     {
-        String baseString = "Experience." + StringUtils.getCapitalized(skill.toString()) + ".";
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
         String explicitString = baseString + StringUtils.getExplicitConfigBlockDataString(data);
         if (config.contains(explicitString))
             return config.getInt(explicitString);
@@ -226,7 +283,7 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
 
     public boolean doesBlockGiveSkillXP(PrimarySkillType skill, Material data)
     {
-        String baseString = "Experience." + StringUtils.getCapitalized(skill.toString()) + ".";
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
         String explicitString = baseString + StringUtils.getExplicitConfigMaterialString(data);
         if (config.contains(explicitString))
             return true;
@@ -239,7 +296,7 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
 
     public boolean doesBlockGiveSkillXP(PrimarySkillType skill, BlockData data)
     {
-        String baseString = "Experience." + StringUtils.getCapitalized(skill.toString()) + ".";
+        String baseString = "Experience_Values." + StringUtils.getCapitalized(skill.toString()) + ".";
         String explicitString = baseString + StringUtils.getExplicitConfigBlockDataString(data);
         if (config.contains(explicitString))
             return true;
@@ -302,27 +359,29 @@ public class ExperienceConfig extends AutoUpdateConfigLoader {
     }
 
     /* Acrobatics */
-    public int getDodgeXPModifier() { return config.getInt("Experience.Acrobatics.Dodge", 120); }
-    public int getRollXPModifier() { return config.getInt("Experience.Acrobatics.Roll", 80); }
-    public int getFallXPModifier() { return config.getInt("Experience.Acrobatics.Fall", 120); }
+    public int getDodgeXPModifier() { return config.getInt("Experience_Values.Acrobatics.Dodge", 120); }
+    public int getRollXPModifier() { return config.getInt("Experience_Values.Acrobatics.Roll", 80); }
+    public int getFallXPModifier() { return config.getInt("Experience_Values.Acrobatics.Fall", 120); }
 
-    public double getFeatherFallXPModifier() { return config.getDouble("Experience.Acrobatics.FeatherFall_Multiplier", 2.0); }
+    public double getFeatherFallXPModifier() { return config.getDouble("Experience_Values.Acrobatics.FeatherFall_Multiplier", 2.0); }
 
     /* Alchemy */
-    public double getPotionXP(PotionStage stage) { return config.getDouble("Experience.Alchemy.Potion_Stage_" + stage.toNumerical(), 10D); }
+    public double getPotionXP(PotionStage stage) { return config.getDouble("Experience_Values.Alchemy.Potion_Stage_" + stage.toNumerical(), 10D); }
 
     /* Archery */
-    public double getArcheryDistanceMultiplier() { return config.getDouble("Experience.Archery.Distance_Multiplier", 0.025); }
+    public double getArcheryDistanceMultiplier() { return config.getDouble("Experience_Values.Archery.Distance_Multiplier", 0.025); }
 
-    public int getFishingShakeXP() { return config.getInt("Experience.Fishing.Shake", 50); }
+    public int getFishingShakeXP() { return config.getInt("Experience_Values.Fishing.Shake", 50); }
 
     /* Repair */
-    public double getRepairXPBase() { return config.getDouble("Experience.Repair.Base", 1000.0); }
-    public double getRepairXP(MaterialType repairMaterialType) { return config.getDouble("Experience.Repair." + StringUtils.getCapitalized(repairMaterialType.toString())); }
+    public double getRepairXPBase() { return config.getDouble("Experience_Values.Repair.Base", 1000.0); }
+    public double getRepairXP(MaterialType repairMaterialType) { return config.getDouble("Experience_Values.Repair." + StringUtils.getCapitalized(repairMaterialType.toString())); }
 
     /* Taming */
     public int getTamingXP(EntityType type)
     {
-        return config.getInt("Experience.Taming.Animal_Taming." + StringUtils.getPrettyEntityTypeString(type));
+        return config.getInt("Experience_Values.Taming.Animal_Taming." + StringUtils.getPrettyEntityTypeString(type));
     }
+
+    public boolean preventStoneLavaFarming() { return config.getBoolean("ExploitFix.LavaStoneAndCobbleFarming", true);}
 }

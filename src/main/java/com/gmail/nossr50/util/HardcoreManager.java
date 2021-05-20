@@ -1,11 +1,14 @@
 package com.gmail.nossr50.util;
 
-import com.gmail.nossr50.config.Config;
 import com.gmail.nossr50.datatypes.interactions.NotificationType;
 import com.gmail.nossr50.datatypes.player.PlayerProfile;
 import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
+import com.gmail.nossr50.mcMMO;
 import com.gmail.nossr50.util.player.NotificationManager;
 import com.gmail.nossr50.util.player.UserManager;
+import com.gmail.nossr50.util.skills.SkillTools;
+import com.gmail.nossr50.worldguard.WorldGuardManager;
+import com.gmail.nossr50.worldguard.WorldGuardUtils;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
@@ -14,17 +17,26 @@ public final class HardcoreManager {
     private HardcoreManager() {}
 
     public static void invokeStatPenalty(Player player) {
-        double statLossPercentage = Config.getInstance().getHardcoreDeathStatPenaltyPercentage();
-        int levelThreshold = Config.getInstance().getHardcoreDeathStatPenaltyLevelThreshold();
+
+        if(WorldGuardUtils.isWorldGuardLoaded()) {
+            if(!WorldGuardManager.getInstance().hasHardcoreFlag(player))
+                return;
+        }
+
+        double statLossPercentage = mcMMO.p.getGeneralConfig().getHardcoreDeathStatPenaltyPercentage();
+        int levelThreshold = mcMMO.p.getGeneralConfig().getHardcoreDeathStatPenaltyLevelThreshold();
+
+        if(UserManager.getPlayer(player) == null)
+            return;
 
         PlayerProfile playerProfile = UserManager.getPlayer(player).getProfile();
         int totalLevelsLost = 0;
 
-        HashMap<String, Integer> levelChanged = new HashMap<String, Integer>();
-        HashMap<String, Float> experienceChanged = new HashMap<String, Float>();
+        HashMap<String, Integer> levelChanged = new HashMap<>();
+        HashMap<String, Float> experienceChanged = new HashMap<>();
 
-        for (PrimarySkillType primarySkillType : PrimarySkillType.NON_CHILD_SKILLS) {
-            if (!primarySkillType.getHardcoreStatLossEnabled()) {
+        for (PrimarySkillType primarySkillType : SkillTools.NON_CHILD_SKILLS) {
+            if (!mcMMO.p.getGeneralConfig().getHardcoreStatLossEnabled(primarySkillType)) {
                 levelChanged.put(primarySkillType.toString(), 0);
                 experienceChanged.put(primarySkillType.toString(), 0F);
                 continue;
@@ -39,7 +51,7 @@ public final class HardcoreManager {
                 continue;
             }
 
-            double statsLost = playerSkillLevel * (statLossPercentage * 0.01D);
+            double statsLost = Math.max(0, (playerSkillLevel - levelThreshold)) * (statLossPercentage * 0.01D);
             int levelsLost = (int) statsLost;
             int xpLost = (int) Math.floor(playerSkillXpLevel * (statsLost - levelsLost));
             levelChanged.put(primarySkillType.toString(), levelsLost);
@@ -56,18 +68,27 @@ public final class HardcoreManager {
     }
 
     public static void invokeVampirism(Player killer, Player victim) {
-        double vampirismStatLeechPercentage = Config.getInstance().getHardcoreVampirismStatLeechPercentage();
-        int levelThreshold = Config.getInstance().getHardcoreVampirismLevelThreshold();
+
+        if(WorldGuardUtils.isWorldGuardLoaded()) {
+            if(!WorldGuardManager.getInstance().hasHardcoreFlag(killer) || !WorldGuardManager.getInstance().hasHardcoreFlag(victim))
+                return;
+        }
+
+        double vampirismStatLeechPercentage = mcMMO.p.getGeneralConfig().getHardcoreVampirismStatLeechPercentage();
+        int levelThreshold = mcMMO.p.getGeneralConfig().getHardcoreVampirismLevelThreshold();
+
+        if(UserManager.getPlayer(killer) == null || UserManager.getPlayer(victim) == null)
+            return;
 
         PlayerProfile killerProfile = UserManager.getPlayer(killer).getProfile();
         PlayerProfile victimProfile = UserManager.getPlayer(victim).getProfile();
         int totalLevelsStolen = 0;
 
-        HashMap<String, Integer> levelChanged = new HashMap<String, Integer>();
-        HashMap<String, Float> experienceChanged = new HashMap<String, Float>();
+        HashMap<String, Integer> levelChanged = new HashMap<>();
+        HashMap<String, Float> experienceChanged = new HashMap<>();
 
-        for (PrimarySkillType primarySkillType : PrimarySkillType.NON_CHILD_SKILLS) {
-            if (!primarySkillType.getHardcoreVampirismEnabled()) {
+        for (PrimarySkillType primarySkillType : SkillTools.NON_CHILD_SKILLS) {
+            if (!mcMMO.p.getGeneralConfig().getHardcoreVampirismEnabled(primarySkillType)) {
                 levelChanged.put(primarySkillType.toString(), 0);
                 experienceChanged.put(primarySkillType.toString(), 0F);
                 continue;
@@ -115,8 +136,8 @@ public final class HardcoreManager {
     public static boolean isStatLossEnabled() {
         boolean enabled = false;
 
-        for (PrimarySkillType primarySkillType : PrimarySkillType.NON_CHILD_SKILLS) {
-            if (primarySkillType.getHardcoreStatLossEnabled()) {
+        for (PrimarySkillType primarySkillType : SkillTools.NON_CHILD_SKILLS) {
+            if (mcMMO.p.getGeneralConfig().getHardcoreStatLossEnabled(primarySkillType)) {
                 enabled = true;
                 break;
             }
@@ -133,8 +154,8 @@ public final class HardcoreManager {
     public static boolean isVampirismEnabled() {
         boolean enabled = false;
 
-        for (PrimarySkillType primarySkillType : PrimarySkillType.NON_CHILD_SKILLS) {
-            if (primarySkillType.getHardcoreVampirismEnabled()) {
+        for (PrimarySkillType primarySkillType : SkillTools.NON_CHILD_SKILLS) {
+            if (mcMMO.p.getGeneralConfig().getHardcoreVampirismEnabled(primarySkillType)) {
                 enabled = true;
                 break;
             }

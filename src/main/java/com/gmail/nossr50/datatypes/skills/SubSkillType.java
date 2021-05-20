@@ -1,7 +1,10 @@
 package com.gmail.nossr50.datatypes.skills;
 
 import com.gmail.nossr50.locale.LocaleLoader;
-import com.gmail.nossr50.util.StringUtils;
+import com.gmail.nossr50.mcMMO;
+import com.gmail.nossr50.util.text.StringUtils;
+
+import java.util.Locale;
 
 public enum SubSkillType {
     /* !! Warning -- Do not let subskills share a name with any existing PrimarySkillType as it will clash with the static import !! */
@@ -18,10 +21,12 @@ public enum SubSkillType {
     ARCHERY_ARROW_RETRIEVAL(1),
     ARCHERY_DAZE,
     ARCHERY_SKILL_SHOT(20),
+    ARCHERY_ARCHERY_LIMIT_BREAK(10),
 
     /* Axes */
     AXES_ARMOR_IMPACT(20),
     AXES_AXE_MASTERY(4),
+    AXES_AXES_LIMIT_BREAK(10),
     AXES_CRITICAL_STRIKES(1),
     AXES_GREATER_IMPACT(1),
     AXES_SKULL_SPLITTER(1),
@@ -34,12 +39,12 @@ public enum SubSkillType {
     FISHING_FISHERMANS_DIET(5),
     FISHING_ICE_FISHING(1),
     FISHING_MAGIC_HUNTER(1),
-    FISHING_MASTER_ANGLER(1),
+    FISHING_MASTER_ANGLER(8),
     FISHING_TREASURE_HUNTER(8),
     FISHING_SHAKE(1),
 
     /* Herbalism */
-    HERBALISM_DOUBLE_DROPS,
+    HERBALISM_DOUBLE_DROPS(1),
     HERBALISM_FARMERS_DIET(5),
     HERBALISM_GREEN_TERRA(1),
     HERBALISM_GREEN_THUMB(4),
@@ -50,7 +55,7 @@ public enum SubSkillType {
     MINING_BIGGER_BOMBS(1),
     MINING_BLAST_MINING(8),
     MINING_DEMOLITIONS_EXPERTISE(1),
-    MINING_DOUBLE_DROPS,
+    MINING_DOUBLE_DROPS(1),
     MINING_SUPER_BREAKER(1),
 
     /* Repair */
@@ -59,12 +64,11 @@ public enum SubSkillType {
     REPAIR_SUPER_REPAIR(1),
 
     /* Salvage */
-    SALVAGE_ADVANCED_SALVAGE(1),
+    SALVAGE_SCRAP_COLLECTOR(8),
     SALVAGE_ARCANE_SALVAGE(8),
 
     /* Smelting */
-    SMELTING_FLUX_MINING(1),
-    SMELTING_FUEL_EFFICIENCY,
+    SMELTING_FUEL_EFFICIENCY(3),
     SMELTING_SECOND_SMELT,
     SMELTING_UNDERSTANDING_THE_ART(8),
 
@@ -72,6 +76,8 @@ public enum SubSkillType {
     SWORDS_COUNTER_ATTACK(1),
     SWORDS_RUPTURE(4),
     SWORDS_SERRATED_STRIKES(1),
+    SWORDS_STAB(2),
+    SWORDS_SWORDS_LIMIT_BREAK(10),
 
     /* Taming */
     TAMING_BEAST_LORE(1),
@@ -90,11 +96,13 @@ public enum SubSkillType {
     UNARMED_BERSERK(1),
     UNARMED_BLOCK_CRACKER,
     UNARMED_DISARM(1),
-    UNARMED_IRON_ARM_STYLE(5),
+    UNARMED_STEEL_ARM_STYLE(20),
     UNARMED_IRON_GRIP(1),
+    UNARMED_UNARMED_LIMIT_BREAK(10),
 
     /* Woodcutting */
 /*    WOODCUTTING_BARK_SURGEON(3),*/
+    WOODCUTTING_KNOCK_ON_WOOD(2),
     WOODCUTTING_HARVEST_LUMBER(1),
     WOODCUTTING_LEAF_BLOWER(1),
 /*    WOODCUTTING_NATURES_BOUNTY(3),
@@ -128,7 +136,7 @@ public enum SubSkillType {
      * If we add skills, those immutable lists need to be updated
      * @return
      */
-    public PrimarySkillType getParentSkill() { return PrimarySkillType.bySecondaryAbility(this); }
+    public PrimarySkillType getParentSkill() { return mcMMO.p.getSkillTools().getPrimarySkillBySubSkill(this); }
 
     /**
      * Returns the root address for this skill in the advanced.yml file
@@ -153,7 +161,7 @@ public enum SubSkillType {
     public String getPermissionNodeAddress()
     {
         //TODO: This could be optimized
-        return "mcmmo.ability." + getParentSkill().toString().toLowerCase() + "." + getConfigName(toString()).toLowerCase();
+        return "mcmmo.ability." + getParentSkill().toString().toLowerCase(Locale.ENGLISH) + "." + getConfigName(toString()).toLowerCase(Locale.ENGLISH);
     }
 
     /**
@@ -174,7 +182,7 @@ public enum SubSkillType {
         /*
          * Find where to begin our substring (after the prefix)
          */
-        String endResult = "";
+        StringBuilder endResult = new StringBuilder();
         int subStringIndex = getSubStringIndex(subSkillName);
 
         /*
@@ -183,24 +191,24 @@ public enum SubSkillType {
         String subskillNameWithoutPrefix = subSkillName.substring(subStringIndex);
         if(subskillNameWithoutPrefix.contains("_"))
         {
-            String splitStrings[] = subskillNameWithoutPrefix.split("_");
+            String[] splitStrings = subskillNameWithoutPrefix.split("_");
 
             for(String string : splitStrings)
             {
-                endResult += StringUtils.getCapitalized(string);
+                endResult.append(StringUtils.getCapitalized(string));
             }
         } else {
-            endResult += StringUtils.getCapitalized(subskillNameWithoutPrefix);
+            endResult.append(StringUtils.getCapitalized(subskillNameWithoutPrefix));
         }
 
-        return endResult;
+        return endResult.toString();
     }
 
     public String getWikiName(String subSkillName) {
         /*
          * Find where to begin our substring (after the prefix)
          */
-        String endResult = "";
+        StringBuilder endResult = new StringBuilder();
         int subStringIndex = getSubStringIndex(subSkillName);
 
         /*
@@ -209,22 +217,22 @@ public enum SubSkillType {
         String subskillNameWithoutPrefix = subSkillName.substring(subStringIndex);
         if(subskillNameWithoutPrefix.contains("_"))
         {
-            String splitStrings[] = subskillNameWithoutPrefix.split("_");
+            String[] splitStrings = subskillNameWithoutPrefix.split("_");
 
             for(int i = 0; i < splitStrings.length; i++)
             {
                 if(i+1 >= splitStrings.length)
-                    endResult+=StringUtils.getCapitalized(splitStrings[i]);
+                    endResult.append(StringUtils.getCapitalized(splitStrings[i]));
                 else {
-                    endResult += StringUtils.getCapitalized(splitStrings[i]);
-                    endResult += "_";
+                    endResult.append(StringUtils.getCapitalized(splitStrings[i]));
+                    endResult.append("_");
                 }
             }
         } else {
-            endResult += StringUtils.getCapitalized(subskillNameWithoutPrefix);
+            endResult.append(StringUtils.getCapitalized(subskillNameWithoutPrefix));
         }
 
-        return endResult;
+        return endResult.toString();
     }
 
     /**
@@ -289,14 +297,12 @@ public enum SubSkillType {
 
     public String getLocaleStat(String... vars)
     {
-        String statMsg = LocaleLoader.getString("Ability.Generic.Template", (Object[]) vars);
-        return statMsg;
+        return LocaleLoader.getString("Ability.Generic.Template", (Object[]) vars);
     }
 
     public String getCustomLocaleStat(String... vars)
     {
-        String statMsg = LocaleLoader.getString("Ability.Generic.Template.Custom", (Object[]) vars);
-        return statMsg;
+        return LocaleLoader.getString("Ability.Generic.Template.Custom", (Object[]) vars);
     }
 
     private String getFromLocaleSubAddress(String s) {

@@ -2,10 +2,12 @@ package com.gmail.nossr50.skills.child;
 
 import com.gmail.nossr50.config.AutoUpdateConfigLoader;
 import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
-import com.gmail.nossr50.util.StringUtils;
+import com.gmail.nossr50.mcMMO;
+import com.gmail.nossr50.util.text.StringUtils;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.EnumSet;
+import java.util.Locale;
 
 public class ChildConfig extends AutoUpdateConfigLoader {
     public ChildConfig() {
@@ -15,24 +17,24 @@ public class ChildConfig extends AutoUpdateConfigLoader {
 
     @Override
     protected void loadKeys() {
-        config.setDefaults(YamlConfiguration.loadConfiguration(plugin.getResourceAsReader("child.yml")));
+        config.setDefaults(YamlConfiguration.loadConfiguration(mcMMO.p.getResourceAsReader("child.yml")));
 
         FamilyTree.clearRegistrations(); // when reloading, need to clear statics
 
-        for (PrimarySkillType skill : PrimarySkillType.CHILD_SKILLS) {
-            plugin.debug("Finding parents of " + skill.name());
+        for (PrimarySkillType skill : mcMMO.p.getSkillTools().CHILD_SKILLS) {
+            mcMMO.p.debug("Finding parents of " + skill.name());
 
             EnumSet<PrimarySkillType> parentSkills = EnumSet.noneOf(PrimarySkillType.class);
             boolean useDefaults = false; // If we had an error we back out and use defaults
 
             for (String name : config.getStringList(StringUtils.getCapitalized(skill.name()))) {
                 try {
-                    PrimarySkillType parentSkill = PrimarySkillType.valueOf(name.toUpperCase());
+                    PrimarySkillType parentSkill = PrimarySkillType.valueOf(name.toUpperCase(Locale.ENGLISH));
                     FamilyTree.enforceNotChildSkill(parentSkill);
                     parentSkills.add(parentSkill);
                 }
                 catch (IllegalArgumentException ex) {
-                    plugin.getLogger().warning(name + " is not a valid skill type, or is a child skill!");
+                    mcMMO.p.getLogger().warning(name + " is not a valid skill type, or is a child skill!");
                     useDefaults = true;
                     break;
                 }
@@ -45,13 +47,13 @@ public class ChildConfig extends AutoUpdateConfigLoader {
                      * If they're dedicated enough to have modified it, they can have the errors it may produce.
                      * Alternatively, this can be used to allow child skills to be parent skills, provided there are no circular dependencies this is an advanced sort of configuration.
                      */
-                    parentSkills.add(PrimarySkillType.valueOf(name.toUpperCase()));
+                    parentSkills.add(PrimarySkillType.valueOf(name.toUpperCase(Locale.ENGLISH)));
                 }
             }
 
             // Register them
             for (PrimarySkillType parentSkill : parentSkills) {
-                plugin.debug("Registering " + parentSkill.name() + " as parent of " + skill.name());
+                mcMMO.p.debug("Registering " + parentSkill.name() + " as parent of " + skill.name());
                 FamilyTree.registerParent(skill, parentSkill);
             }
         }

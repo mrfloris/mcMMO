@@ -1,77 +1,133 @@
 package com.gmail.nossr50.util.random;
 
-import com.gmail.nossr50.config.AdvancedConfig;
-import com.gmail.nossr50.datatypes.skills.PrimarySkillType;
+import com.gmail.nossr50.datatypes.player.McMMOPlayer;
 import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.util.Permissions;
 import com.gmail.nossr50.util.player.UserManager;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class RandomChanceSkill implements RandomChanceExecution {
-
-    protected final PrimarySkillType primarySkillType;
-    protected final SubSkillType subSkillType;
     protected final double probabilityCap;
     protected final boolean isLucky;
-    private int skillLevel;
+    protected int skillLevel;
+    protected final double resultModifier;
+    protected final double maximumBonusLevelCap;
 
-    public RandomChanceSkill(Player player, SubSkillType subSkillType)
-    {
-        this.primarySkillType = subSkillType.getParentSkill();
-        this.subSkillType = subSkillType;
+    public RandomChanceSkill(@Nullable Player player, @NotNull SubSkillType subSkillType, double resultModifier) {
         this.probabilityCap = RandomChanceUtil.LINEAR_CURVE_VAR;
 
-        if(player != null)
-            this.skillLevel = UserManager.getPlayer(player).getSkillLevel(primarySkillType);
-        else
+        final McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+        if (player != null && mcMMOPlayer != null) {
+            this.skillLevel = mcMMOPlayer.getSkillLevel(subSkillType.getParentSkill());
+        } else {
             this.skillLevel = 0;
+        }
 
-        if(player != null)
-            isLucky = Permissions.lucky(player, primarySkillType);
+        if (player != null)
+            isLucky = Permissions.lucky(player, subSkillType.getParentSkill());
         else
             isLucky = false;
+
+        this.resultModifier = resultModifier;
+        this.maximumBonusLevelCap = RandomChanceUtil.getMaxBonusLevelCap(subSkillType);
     }
 
-    public RandomChanceSkill(Player player, SubSkillType subSkillType, boolean hasCap)
-    {
-        if(hasCap)
-            this.probabilityCap = AdvancedConfig.getInstance().getMaximumProbability(subSkillType);
+    public RandomChanceSkill(@Nullable Player player, @NotNull SubSkillType subSkillType) {
+        this.probabilityCap = RandomChanceUtil.LINEAR_CURVE_VAR;
+
+        final McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+        if (player != null && mcMMOPlayer != null) {
+            this.skillLevel = mcMMOPlayer.getSkillLevel(subSkillType.getParentSkill());
+        } else {
+            this.skillLevel = 0;
+        }
+
+        if (player != null)
+            isLucky = Permissions.lucky(player, subSkillType.getParentSkill());
+        else
+            isLucky = false;
+
+        this.resultModifier = 1.0D;
+        this.maximumBonusLevelCap = RandomChanceUtil.getMaxBonusLevelCap(subSkillType);
+    }
+
+    public RandomChanceSkill(@Nullable Player player, @NotNull SubSkillType subSkillType, boolean hasCap) {
+        if (hasCap)
+            this.probabilityCap = RandomChanceUtil.getMaximumProbability(subSkillType);
         else
             this.probabilityCap = RandomChanceUtil.LINEAR_CURVE_VAR;
 
-        this.primarySkillType = subSkillType.getParentSkill();
-        this.subSkillType = subSkillType;
-
-        if(player != null)
-            this.skillLevel = UserManager.getPlayer(player).getSkillLevel(primarySkillType);
-        else
+        final McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+        if (player != null && mcMMOPlayer != null) {
+            this.skillLevel = mcMMOPlayer.getSkillLevel(subSkillType.getParentSkill());
+        } else {
             this.skillLevel = 0;
+        }
 
-        if(player != null)
-            isLucky = Permissions.lucky(player, primarySkillType);
+        if (player != null)
+            isLucky = Permissions.lucky(player, subSkillType.getParentSkill());
         else
             isLucky = false;
+
+        this.resultModifier = 1.0D;
+        this.maximumBonusLevelCap = RandomChanceUtil.getMaxBonusLevelCap(subSkillType);
     }
 
-    /**
-     * The subskill corresponding to this RandomChanceSkill
-     * @return this subskill
-     */
-    public SubSkillType getSubSkill() {
-        return subSkillType;
+    public RandomChanceSkill(@Nullable Player player, @NotNull SubSkillType subSkillType, boolean hasCap, boolean luckyOverride) {
+        if (hasCap)
+            this.probabilityCap = RandomChanceUtil.getMaximumProbability(subSkillType);
+        else
+            this.probabilityCap = RandomChanceUtil.LINEAR_CURVE_VAR;
+
+        final McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+        if (player != null && mcMMOPlayer != null) {
+            this.skillLevel = mcMMOPlayer.getSkillLevel(subSkillType.getParentSkill());
+        } else {
+            this.skillLevel = 0;
+        }
+
+        isLucky = luckyOverride;
+
+        this.resultModifier = 1.0D;
+        this.maximumBonusLevelCap = RandomChanceUtil.getMaxBonusLevelCap(subSkillType);
+    }
+
+    public RandomChanceSkill(@Nullable Player player, @NotNull SubSkillType subSkillType, boolean hasCap, double resultModifier) {
+        if (hasCap)
+            this.probabilityCap = RandomChanceUtil.getMaximumProbability(subSkillType);
+        else
+            this.probabilityCap = RandomChanceUtil.LINEAR_CURVE_VAR;
+
+        final McMMOPlayer mcMMOPlayer = UserManager.getPlayer(player);
+        if (player != null && mcMMOPlayer != null) {
+            this.skillLevel = mcMMOPlayer.getSkillLevel(subSkillType.getParentSkill());
+        } else {
+            this.skillLevel = 0;
+        }
+
+        if (player != null)
+            isLucky = Permissions.lucky(player, subSkillType.getParentSkill());
+        else
+            isLucky = false;
+
+        this.resultModifier = resultModifier;
+        this.maximumBonusLevelCap = RandomChanceUtil.getMaxBonusLevelCap(subSkillType);
     }
 
     /**
      * Gets the skill level of the player who owns this RandomChanceSkill
+     *
      * @return the current skill level relating to this RandomChanceSkill
      */
-    public int getSkillLevel()
-    {
+    public int getSkillLevel() {
         return skillLevel;
     }
 
     /**
      * Modify the skill level used for this skill's RNG calculations
+     *
      * @param newSkillLevel new skill level
      */
     public void setSkillLevel(int newSkillLevel) {
@@ -86,7 +142,7 @@ public class RandomChanceSkill implements RandomChanceExecution {
      * @return the maximum bonus from skill level for this skill
      */
     public double getMaximumBonusLevelCap() {
-        return AdvancedConfig.getInstance().getMaxBonusLevel(subSkillType);
+        return maximumBonusLevelCap;
     }
 
     /**
@@ -112,5 +168,9 @@ public class RandomChanceSkill implements RandomChanceExecution {
 
     public boolean isLucky() {
         return isLucky;
+    }
+
+    public double getResultModifier() {
+        return resultModifier;
     }
 }

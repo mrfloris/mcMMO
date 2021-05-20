@@ -56,19 +56,19 @@ public final class AlchemyPotionBrewer {
     }
 
     private static void removeIngredient(BrewerInventory inventory, Player player) {
-        ItemStack ingredient = inventory.getIngredient() == null ? null : inventory.getIngredient().clone();
+        if(inventory.getIngredient() == null)
+            return;
 
-        if (isEmpty(ingredient) || !isValidIngredient(player, ingredient)) {
-            return;
-        }
-        else if (ingredient.getAmount() <= 1) {
-            inventory.setIngredient(null);
-            return;
-        }
-        else {
-            ingredient.setAmount(ingredient.getAmount() - 1);
-            inventory.setIngredient(ingredient);
-            return;
+        ItemStack ingredient = inventory.getIngredient().clone();
+
+        if (!isEmpty(ingredient) && isValidIngredient(player, ingredient)) {
+            if (ingredient.getAmount() <= 1) {
+                inventory.setIngredient(null);
+            }
+            else {
+                ingredient.setAmount(ingredient.getAmount() - 1);
+                inventory.setIngredient(ingredient);
+            }
         }
     }
 
@@ -93,7 +93,12 @@ public final class AlchemyPotionBrewer {
     }
 
     private static List<ItemStack> getValidIngredients(Player player) {
-        return PotionConfig.getInstance().getIngredients((player == null || !Permissions.isSubSkillEnabled(player, SubSkillType.ALCHEMY_CONCOCTIONS)) ? 1 : UserManager.getPlayer(player).getAlchemyManager().getTier());
+        if(player == null || UserManager.getPlayer(player) == null)
+        {
+            return PotionConfig.getInstance().getIngredients(1);
+        }
+
+        return PotionConfig.getInstance().getIngredients(!Permissions.isSubSkillEnabled(player, SubSkillType.ALCHEMY_CONCOCTIONS) ? 1 : UserManager.getPlayer(player).getAlchemyManager().getTier());
     }
 
     public static void finishBrewing(BlockState brewingStand, Player player, boolean forced) {
@@ -108,7 +113,8 @@ public final class AlchemyPotionBrewer {
             return;
         }
 
-        List<AlchemyPotion> inputList = new ArrayList<AlchemyPotion>();
+        List<AlchemyPotion> inputList = new ArrayList<>();
+        ItemStack[] outputList = new ItemStack[3];
 
         for (int i = 0; i < 3; i++) {
             ItemStack item = inventory.getItem(i);
@@ -123,7 +129,7 @@ public final class AlchemyPotionBrewer {
             inputList.add(input);
 
             if (output != null) {
-                inventory.setItem(i, output.toItemStack(item.getAmount()).clone());
+                outputList[i] = output.toItemStack(item.getAmount()).clone();
             }
         }
 
@@ -134,6 +140,12 @@ public final class AlchemyPotionBrewer {
             return;
         }
 
+        for (int i = 0; i < 3; i++) {
+            if(outputList[i] != null) {
+                inventory.setItem(i, outputList[i]);
+            }
+        }
+
         removeIngredient(inventory, player);
 
         for (AlchemyPotion input : inputList) {
@@ -142,6 +154,7 @@ public final class AlchemyPotionBrewer {
             if (output != null && player != null) {
                 PotionStage potionStage = PotionStage.getPotionStage(input, output);
 
+                //TODO: hmm
                 if (UserManager.hasPlayerDataKey(player)) {
                     UserManager.getPlayer(player).getAlchemyManager().handlePotionBrewSuccesses(potionStage, 1);
                 }

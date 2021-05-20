@@ -5,17 +5,17 @@ import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.locale.LocaleLoader;
 import com.gmail.nossr50.skills.salvage.Salvage;
 import com.gmail.nossr50.skills.salvage.SalvageManager;
-import com.gmail.nossr50.util.TextComponentFactory;
 import com.gmail.nossr50.util.player.UserManager;
 import com.gmail.nossr50.util.skills.RankUtils;
-import net.md_5.bungee.api.chat.TextComponent;
+import com.gmail.nossr50.util.text.TextComponentFactory;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class SalvageCommand extends SkillCommand {
-    private boolean canAdvancedSalvage;
+    private boolean canScrapCollector;
     private boolean canArcaneSalvage;
 
     public SalvageCommand() {
@@ -30,18 +30,20 @@ public class SalvageCommand extends SkillCommand {
 
     @Override
     protected void permissionsCheck(Player player) {
-        canAdvancedSalvage = canUseSubskill(player, SubSkillType.SALVAGE_ADVANCED_SALVAGE);
+        canScrapCollector = canUseSubskill(player, SubSkillType.SALVAGE_SCRAP_COLLECTOR);
         canArcaneSalvage = canUseSubskill(player, SubSkillType.SALVAGE_ARCANE_SALVAGE);
     }
 
     @Override
     protected List<String> statsDisplay(Player player, float skillValue, boolean hasEndurance, boolean isLucky) {
-        List<String> messages = new ArrayList<String>();
+        List<String> messages = new ArrayList<>();
         SalvageManager salvageManager = UserManager.getPlayer(player).getSalvageManager();
 
-        if (canAdvancedSalvage) {
-            messages.add(LocaleLoader.getString("Ability.Generic.Template", LocaleLoader.getString("Salvage.Ability.Bonus.0"),
-                    LocaleLoader.getString("Salvage.Ability.Bonus.1", salvageManager.getSalvageableAmount())));
+        if (canScrapCollector) {
+            messages.add(getStatMessage(false, true,
+                    SubSkillType.SALVAGE_SCRAP_COLLECTOR,
+                    String.valueOf(RankUtils.getRank(player, SubSkillType.SALVAGE_SCRAP_COLLECTOR)),
+                    RankUtils.getHighestRankStr(SubSkillType.SALVAGE_SCRAP_COLLECTOR)));
         }
 
         if (canArcaneSalvage) {
@@ -62,8 +64,8 @@ public class SalvageCommand extends SkillCommand {
     }
 
     @Override
-    protected List<TextComponent> getTextComponents(Player player) {
-        List<TextComponent> textComponents = new ArrayList<>();
+    protected List<Component> getTextComponents(Player player) {
+        List<Component> textComponents = new ArrayList<>();
 
         TextComponentFactory.getSubSkillTextComponents(player, textComponents, PrimarySkillType.SALVAGE);
 

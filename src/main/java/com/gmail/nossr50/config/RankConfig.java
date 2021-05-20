@@ -2,8 +2,11 @@ package com.gmail.nossr50.config;
 
 import com.gmail.nossr50.datatypes.skills.SubSkillType;
 import com.gmail.nossr50.datatypes.skills.subskills.AbstractSubSkill;
+import com.gmail.nossr50.mcMMO;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 public class RankConfig extends AutoUpdateConfigLoader {
@@ -13,7 +16,7 @@ public class RankConfig extends AutoUpdateConfigLoader {
     {
         super("skillranks.yml");
         validate();
-        this.instance = this;
+        instance = this;
     }
 
     @Override
@@ -31,7 +34,7 @@ public class RankConfig extends AutoUpdateConfigLoader {
 
     @Override
     protected boolean validateKeys() {
-        List<String> reason = new ArrayList<String>();
+        List<String> reason = new ArrayList<>();
 
         /*
          * In the future this method will check keys for all skills, but for now it only checks overhauled skills
@@ -56,6 +59,18 @@ public class RankConfig extends AutoUpdateConfigLoader {
 
     /**
      * Returns the unlock level for a subskill depending on the gamemode
+     * @param subSkillType target subskill
+     * @param rank the rank we are checking
+     * @return the level requirement for a subskill at this particular rank
+     */
+    public int getSubSkillUnlockLevel(SubSkillType subSkillType, int rank, boolean retroMode)
+    {
+        String key = getRankAddressKey(subSkillType, rank, retroMode);
+        return config.getInt(key, getInternalConfig().getInt(key));
+    }
+
+    /**
+     * Returns the unlock level for a subskill depending on the gamemode
      * @param abstractSubSkill target subskill
      * @param rank the rank we are checking
      * @return the level requirement for a subskill at this particular rank
@@ -74,7 +89,7 @@ public class RankConfig extends AutoUpdateConfigLoader {
      * @return the level requirement for a subskill at this particular rank
      */
     private int findRankByRootAddress(int rank, String key) {
-        String scalingKey = Config.getInstance().getIsRetroMode() ? ".RetroMode." : ".Standard.";
+        String scalingKey = mcMMO.p.getGeneralConfig().getIsRetroMode() ? ".RetroMode." : ".Standard.";
 
         String targetRank = "Rank_" + rank;
 
@@ -84,12 +99,61 @@ public class RankConfig extends AutoUpdateConfigLoader {
         return config.getInt(key);
     }
 
+    public String getRankAddressKey(SubSkillType subSkillType, int rank, boolean retroMode) {
+        String key = subSkillType.getRankConfigAddress();
+        String scalingKey = retroMode ? ".RetroMode." : ".Standard.";
+
+        String targetRank = "Rank_" + rank;
+
+        key += scalingKey;
+        key += targetRank;
+
+        return key;
+    }
+
+    public String getRankAddressKey(AbstractSubSkill subSkillType, int rank, boolean retroMode) {
+        String key = subSkillType.getPrimaryKeyName() + "." + subSkillType.getConfigKeyName();
+        String scalingKey = retroMode ? ".RetroMode." : ".Standard.";
+
+        String targetRank = "Rank_" + rank;
+
+        key += scalingKey;
+        key += targetRank;
+
+        return key;
+    }
+
+    private void resetRankValue(@NotNull SubSkillType subSkillType, int rank, boolean retroMode) {
+        String key = getRankAddressKey(subSkillType, rank, retroMode);
+        int defaultValue = getInternalConfig().getInt(key);
+        config.set(key, defaultValue);
+        mcMMO.p.getLogger().info(key +" SET -> " + defaultValue);
+    }
+
     /**
      * Checks for valid keys for subskill ranks
      */
-    private void checkKeys(List<String> reasons)
+    private void checkKeys(@NotNull List<String> reasons)
     {
+        HashSet<SubSkillType> badSkillSetup = new HashSet<>();
+        
         //For now we will only check ranks of stuff I've overhauled
+        checkConfig(reasons, badSkillSetup, true);
+        checkConfig(reasons, badSkillSetup, false);
+
+        //Fix bad entries
+        if(badSkillSetup.isEmpty())
+            return;
+
+        mcMMO.p.getLogger().info("(FIXING CONFIG) mcMMO is correcting a few mistakes found in your skill rank config setup");
+
+        for(SubSkillType subSkillType : badSkillSetup) {
+            mcMMO.p.getLogger().info("(FIXING CONFIG) Resetting rank config settings for skill named - "+subSkillType.toString());
+            fixBadEntries(subSkillType);
+        }
+    }
+
+    private void checkConfig(@NotNull List<String> reasons, @NotNull HashSet<SubSkillType> badSkillSetup, boolean retroMode) {
         for(SubSkillType subSkillType : SubSkillType.values())
         {
             //Keeping track of the rank requirements and making sure there are no logical errors
@@ -98,23 +162,42 @@ public class RankConfig extends AutoUpdateConfigLoader {
 
             for(int x = 0; x < subSkillType.getNumRanks(); x++)
             {
+                int index = x+1;
+
                 if(curRank > 0)
                     prevRank = curRank;
 
-                curRank = getSubSkillUnlockLevel(subSkillType, x);
+                curRank = getSubSkillUnlockLevel(subSkillType, index, retroMode);
 
                 //Do we really care if its below 0? Probably not
                 if(curRank < 0)
                 {
-                    reasons.add(subSkillType.getAdvConfigAddress() + ".Rank_Levels.Rank_"+curRank+".LevelReq should be above or equal to 0!");
+                    reasons.add("(CONFIG ISSUE) " + subSkillType.toString() + " should not have any ranks that require a negative level!");
+                    badSkillSetup.add(subSkillType);
+                    continue;
                 }
 
                 if(prevRank > curRank)
                 {
                     //We're going to allow this but we're going to warn them
-                    plugin.getLogger().info("You have the ranks for the subskill "+ subSkillType.toString()+" set up poorly, sequential ranks should have ascending requirements");
+                    mcMMO.p.getLogger().info("(CONFIG ISSUE) You have the ranks for the subskill "+ subSkillType.toString()+" set up poorly, sequential ranks should have ascending requirements");
+                    badSkillSetup.add(subSkillType);
                 }
             }
         }
+    }
+
+    private void fixBadEntries(@NotNull SubSkillType subSkillType) {
+        for(int x = 0; x < subSkillType.getNumRanks(); x++)
+        {
+            int index = x+1;
+
+            //Reset Retromode entries
+            resetRankValue(subSkillType, index, true);
+            //Reset Standard Entries
+            resetRankValue(subSkillType, index, false);
+        }
+
+        saveConfig();
     }
 }
